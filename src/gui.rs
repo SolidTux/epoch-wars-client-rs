@@ -168,37 +168,6 @@ impl Gui {
         let mut excavation_position = None;
         let mut temp_building = None;
         'running: loop {
-            if let Ok(msg) = self.rx.try_recv() {
-                match msg {
-                    ToGuiMessage::Message(t, s) => {
-                        show_simple_message_box(
-                            MessageBoxFlag::empty(),
-                            &t,
-                            &s,
-                            self.canvas.window(),
-                        )?;
-                    }
-                    ToGuiMessage::ExcavateResult(d, b, p) => match b {
-                        Some(building) => show_simple_message_box(
-                            MessageBoxFlag::empty(),
-                            "Excavation Results",
-                            &format!(
-                                "Found {:?} at depth {} on position {}, {}.",
-                                building, d, p.0, p.1
-                            ),
-                            self.canvas.window(),
-                        )?,
-                        None => show_simple_message_box(
-                            MessageBoxFlag::empty(),
-                            "Excavation Results",
-                            &format!("Found nothing at position {}, {}.", p.0, p.1),
-                            self.canvas.window(),
-                        )?,
-                    },
-                    ToGuiMessage::ClearBuilding => temp_building = None,
-                    ToGuiMessage::ClearExcavate => excavation_position = None,
-                }
-            }
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. }
@@ -219,7 +188,7 @@ impl Gui {
                         let gy = (y - (y_min as i32)) / (s as i32);
                         let gx = gx as u32;
                         let gy = gy as u32;
-                        if (gx > 0) && (gx < nx) && (gx > 0) && (gx < nx) {
+                        if (gx >= 0) && (gx < nx) && (gy >= 0) && (gy < ny) {
                             self.tx.send(FromGuiMessage::Excavate((gx, gy)))?;
                             excavation_position = Some((gx, gy));
                         }
@@ -232,16 +201,20 @@ impl Gui {
                     } => {
                         let gx = (x - (x_min as i32)) / (s as i32);
                         let gy = (y - (y_min as i32)) / (s as i32);
-                        let gx = gx as u32;
-                        let gy = gy as u32;
                         let building = match self.active {
                             0 => Building::House,
                             1 => Building::Villa,
                             2 => Building::Tower,
                             _ => Building::House,
                         };
-                        let bs = self.assets.buildings[&building].size;
-                        if (gx > bs) && (gx < (nx - bs)) && (gx > bs) && (gx < (nx - bs)) {
+                        let bs = self.assets.buildings[&building].size as i32;
+                        if (gx >= bs)
+                            && (gx < (nx as i32 - bs))
+                            && (gy >= bs)
+                            && (gy < (nx as i32 - bs))
+                        {
+                            let gx = gx as u32;
+                            let gy = gy as u32;
                             temp_building = Some(((gx, gy), building.clone()));
                             self.tx.send(FromGuiMessage::Build((gx, gy), building))?;
                         } else if (x < (x_min as i32)) && (y > ((h as i32) - ew)) {
@@ -359,6 +332,38 @@ impl Gui {
             }
             counter = counter + 1;
             self.canvas.present();
+            if let Ok(msg) = self.rx.try_recv() {
+                match msg {
+                    ToGuiMessage::Message(t, s) => {
+                        show_simple_message_box(
+                            MessageBoxFlag::empty(),
+                            &t,
+                            &s,
+                            self.canvas.window(),
+                        )?;
+                    }
+                    ToGuiMessage::ExcavateResult(d, b, p) => match b {
+                        Some(building) => show_simple_message_box(
+                            MessageBoxFlag::empty(),
+                            "Excavation Results",
+                            &format!(
+                                "Found {:?} at depth {} on position {}, {}.",
+                                building, d, p.0, p.1
+                            ),
+                            self.canvas.window(),
+                        )?,
+                        None => show_simple_message_box(
+                            MessageBoxFlag::empty(),
+                            "Excavation Results",
+                            &format!("Found nothing at position {}, {}.", p.0, p.1),
+                            self.canvas.window(),
+                        )?,
+                    },
+                    ToGuiMessage::ClearBuilding => temp_building = None,
+                    ToGuiMessage::ClearExcavate => excavation_position = None,
+                    ToGuiMessage::Quit => break 'running,
+                }
+            }
         }
         Ok(())
     }

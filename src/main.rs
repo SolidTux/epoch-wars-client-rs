@@ -42,6 +42,11 @@ fn main() {
                 .help("Increase verbosity. Can be specified multiple times."),
         )
         .arg(
+            Arg::with_name("direct")
+                .short("d")
+                .help("Use direct connection to server instead of session server."),
+        )
+        .arg(
             Arg::with_name("token")
                 .short("t")
                 .long("token")
@@ -50,7 +55,6 @@ fn main() {
         )
         .arg(
             Arg::with_name("address")
-                .required(true)
                 .takes_value(true)
                 .help("Address of server"),
         )
@@ -70,7 +74,7 @@ fn main() {
 fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let address = matches.value_of("address").unwrap_or("localhost:4200");
     let name = matches.value_of("name").unwrap_or("Noname");
-    let gui = matches.is_present("gui");
+    let direct = matches.is_present("direct");
     let game = Arc::new(Mutex::new(Game::new()));
 
     let (tx_gui, rx_net) = mpsc::channel();
@@ -83,7 +87,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
         rx_net,
         game.clone(),
     );
-    let handle = thread::spawn(move || client.run());
+    let handle = thread::spawn(move || client.run(direct));
 
     let mut g = Gui::new((800, 600), false, tx_gui, rx_gui, game.clone())?;
     g.run();

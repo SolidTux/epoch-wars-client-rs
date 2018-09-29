@@ -95,15 +95,6 @@ impl EpochClient {
         }
     }
 
-    pub fn run(&self) {
-        if let Err(err) = self.run_res() {
-            for e in err.iter_chain() {
-                error!("{}", e);
-            }
-        }
-        debug!("Network thread finished.");
-    }
-
     fn listen(
         mut reader: BufReader<TcpStream>,
         tx: Sender<ToGuiMessage>,
@@ -160,13 +151,20 @@ impl EpochClient {
                             subtype: st,
                         } => {
                             error!("Error message from server: \n{}", msg);
-                            tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                             if let Some(subtype) = st {
                                 match subtype.to_lowercase().as_str() {
                                     "invalidbuilderror" => tx.send(ToGuiMessage::ClearBuilding)?,
+                                    "buildactionalreadyusederror" => {
+                                        tx.send(ToGuiMessage::ClearBuilding)?
+                                    }
+                                    "gamealreadyrunning" => {
+                                        tx.send(ToGuiMessage::Quit)?;
+                                        return Ok(());
+                                    }
                                     s => trace!("Got error subtype {}", s),
                                 }
                             }
+                            tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                         }
                         _ => warn!("Unimplemented answer type received."),
                     }
@@ -180,29 +178,49 @@ impl EpochClient {
         }
     }
 
-    fn run_res(&self) -> Result<(), Error> {
+    pub fn run(&self, direct: bool) {
+        if let Err(err) = self.run_res(direct) {
+            for e in err.iter_chain() {
+                error!("{}", e);
+            }
+        }
+        debug!("Network thread finished.");
+    }
+
+    fn run_res(&self, direct: bool) -> Result<(), Error> {
         debug!("Connecting to address: {}", self.address);
         let mut stream = {
-            let tmp = TcpStream::connect_timeout(
-                &self
-                    .address
-                    .to_socket_addrs()?
-                    .next()
-                    .ok_or(format_err!("Error while parsing address."))?,
-                Duration::from_millis(20000),
-            )?;
-            let mut line = String::new();
-            let mut reader = BufReader::new(tmp);
-            reader.read_line(&mut line)?;
-            debug!("Using server {}", line.trim());
-            TcpStream::connect_timeout(
-                &line
-                    .trim()
-                    .to_socket_addrs()?
-                    .next()
-                    .ok_or(format_err!("Error while parsing address."))?,
-                Duration::from_millis(20000),
-            )?
+            if direct {
+                TcpStream::connect_timeout(
+                    &self
+                        .address
+                        .to_socket_addrs()?
+                        .next()
+                        .ok_or(format_err!("Error while parsing address."))?,
+                    Duration::from_millis(20000),
+                )?
+            } else {
+                let tmp = TcpStream::connect_timeout(
+                    &self
+                        .address
+                        .to_socket_addrs()?
+                        .next()
+                        .ok_or(format_err!("Error while parsing address."))?,
+                    Duration::from_millis(20000),
+                )?;
+                let mut line = String::new();
+                let mut reader = BufReader::new(tmp);
+                reader.read_line(&mut line)?;
+                debug!("Using server {}", line.trim());
+                TcpStream::connect_timeout(
+                    &line
+                        .trim()
+                        .to_socket_addrs()?
+                        .next()
+                        .ok_or(format_err!("Error while parsing address."))?,
+                    Duration::from_millis(20000),
+                )?
+            }
         };
         stream.set_write_timeout(Some(Duration::from_millis(1000)))?;
         debug!("Connected.");
