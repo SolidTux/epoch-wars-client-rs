@@ -68,7 +68,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let handle = thread::spawn(move || client.run());
 
     if gui {
-        let mut g = Gui::new()?;
+        let mut g = Gui::new((800, 600), game.clone())?;
         g.run();
     }
 
