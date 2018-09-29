@@ -205,22 +205,9 @@ impl EpochClient {
                     y: pos.1,
                     building,
                 }.send(&mut stream)?,
+                FromGuiMessage::Quit => break,
             }
         }
-
-        //while reader.read_line(&mut line).is_ok() {
-        //match Command::from_line(&line) {
-        //Ok(cmd) => {
-        //cmd.send(&mut stream);
-        //}
-        //Err(err) => {
-        //for e in err.iter_chain() {
-        //error!("{}", e);
-        //}
-        //}
-        //}
-        //line.clear();
-        //}
 
         handle
             .join()

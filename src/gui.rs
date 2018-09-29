@@ -26,6 +26,7 @@ pub struct Gui {
     ttf_context: Sdl2TtfContext,
     canvas: WindowCanvas,
     assets: Assets,
+    active: usize,
     tx: Sender<FromGuiMessage>,
 }
 
@@ -104,6 +105,7 @@ impl Gui {
         canvas.present();
         Ok(Gui {
             game,
+            active: 0,
             size,
             context,
             ttf_context,
@@ -151,7 +153,10 @@ impl Gui {
                     | Event::KeyDown {
                         keycode: Some(Keycode::Escape),
                         ..
-                    } => break 'running,
+                    } => {
+                        self.tx.send(FromGuiMessage::Quit)?;
+                        break 'running;
+                    }
                     Event::MouseButtonUp {
                         mouse_btn: MouseButton::Left,
                         x,
@@ -174,6 +179,27 @@ impl Gui {
             thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
             self.canvas.set_draw_color(Color::RGB(50, 50, 50));
             self.canvas.clear();
+            let ew = (x_min / 3) as i32;
+            let eg = (ew * 1 / 10) as i32;
+            for (i, building) in [Building::House, Building::Villa, Building::Tower]
+                .iter()
+                .enumerate()
+            {
+                let texture = texture_creator
+                    .load_texture(&self.assets.buildings[&building].path)
+                    .map_err(err_msg)?;
+                let r = Rect::new(
+                    (i as i32) * ew + eg,
+                    (h as i32) - ew - eg,
+                    (ew - 2 * eg) as u32,
+                    (ew - 2 * eg) as u32,
+                );
+                if i == self.active {
+                    self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                    self.canvas.fill_rect(r);
+                }
+                self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
+            }
             if let Ok(game) = self.game.lock() {
                 nx = game.size.0;
                 ny = game.size.1;
