@@ -28,6 +28,15 @@ enum Command {
     },
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+enum Answer {
+    Welcome { player: usize },
+    EndOfTurn { scores: Vec<usize> },
+    Debug { message: String },
+}
+
 impl Command {
     pub fn from_line(s: &str) -> Result<Command, Error> {
         let parts = s.trim().split(' ').collect::<Vec<&str>>();
@@ -82,7 +91,19 @@ impl EpochClient {
         let handle = thread::spawn(move || {
             let mut line = String::new();
             while reader.read_line(&mut line).is_ok() {
-                print!("{}", line.replace(";", "\n"));
+                trace!("{}", line.trim());
+                match serde_json::from_str::<Answer>(&line.trim()) {
+                    Ok(a) => {
+                        debug!("Answer: {:?}", a);
+                        match a {
+                            Answer::Debug { message: msg } => {
+                                info!("Debug message from server: \n{}", msg)
+                            }
+                            _ => warn!("Unimplemented answer type received."),
+                        }
+                    }
+                    Err(e) => warn!("{}", e),
+                }
                 line.clear()
             }
         });

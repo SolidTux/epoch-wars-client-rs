@@ -20,7 +20,7 @@ use gui::*;
 use network::*;
 
 use clap::{App, Arg, ArgMatches};
-use failure::{err_msg, Error};
+use failure::Error;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
