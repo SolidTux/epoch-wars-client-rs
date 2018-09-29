@@ -161,9 +161,11 @@ impl EpochClient {
                         } => {
                             error!("Error message from server: \n{}", msg);
                             tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
-                            match st {
-                                Some(s) => trace!("Got error subtype {}", s),
-                                None => {}
+                            if let Some(subtype) = st {
+                                match subtype.to_lowercase().as_str() {
+                                    "invalidbuilderror" => tx.send(ToGuiMessage::ClearBuilding)?,
+                                    s => trace!("Got error subtype {}", s),
+                                }
                             }
                         }
                         _ => warn!("Unimplemented answer type received."),
