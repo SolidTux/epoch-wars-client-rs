@@ -35,6 +35,8 @@ enum Command {
 enum Answer {
     Welcome {
         player: usize,
+        map_size: (u32, u32),
+        rejoin: String,
     },
     EndOfTurn {
         scores: Vec<usize>,
@@ -115,9 +117,15 @@ impl EpochClient {
                         Ok(a) => {
                             debug!("Answer: {:?}", a);
                             match a {
-                                Answer::Welcome { player: p } => {
+                                Answer::Welcome {
+                                    player: p,
+                                    map_size: s,
+                                    rejoin: r,
+                                } => {
                                     if let Ok(mut g) = game.lock() {
                                         (*g).player = Some(p);
+                                        (*g).size = s;
+                                        (*g).rejoin = r.clone();
                                     }
                                 }
                                 Answer::EndOfTurn { scores: _, map: m } => {

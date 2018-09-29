@@ -21,6 +21,7 @@ pub struct Gui {
     context: Sdl,
     canvas: WindowCanvas,
     building_textures: HashMap<Building, String>,
+    background_texture: String,
 }
 
 impl Gui {
@@ -38,9 +39,9 @@ impl Gui {
         let mut canvas = window.into_canvas().build()?;
 
         let building_textures: HashMap<Building, String> = [
-            (Building::House, "res/preview.jpg".to_string()),
-            (Building::Villa, "res/preview.jpg".to_string()),
-            (Building::Tower, "res/preview.jpg".to_string()),
+            (Building::House, "res/house.png".to_string()),
+            (Building::Villa, "res/villa.png".to_string()),
+            (Building::Tower, "res/tower.png".to_string()),
         ].iter()
             .cloned()
             .collect();
@@ -54,6 +55,7 @@ impl Gui {
             context,
             canvas,
             building_textures,
+            background_texture: String::from("res/bg.png"),
         })
     }
 
@@ -67,6 +69,9 @@ impl Gui {
 
     pub fn run_res(&mut self) -> Result<(), Error> {
         let texture_creator = self.canvas.texture_creator();
+        let bg_texture = texture_creator
+            .load_texture(&self.background_texture)
+            .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
         let mut counter = 0;
         'running: loop {
@@ -88,8 +93,16 @@ impl Gui {
                 let x = (w as f64) / (nx as f64);
                 let y = (h as f64) / (ny as f64);
                 let s = x.min(y).round() as u32;
-                let x_min: u32 = (w - s * nx) / 2;
-                let y_min: u32 = (h - s * ny) / 2;
+                let x_min = (w - s * nx) / 2;
+                let y_min = (h - s * ny) / 2;
+                for xt in 0..nx {
+                    for yt in 0..ny {
+                        let r = Rect::new((x_min + s * xt) as i32, (y_min + s * yt) as i32, s, s);
+                        self.canvas
+                            .copy(&bg_texture, None, Some(r))
+                            .map_err(err_msg)?;
+                    }
+                }
                 for (pos, building) in &game.buildings {
                     let texture = texture_creator
                         .load_texture(&self.building_textures[&building])
