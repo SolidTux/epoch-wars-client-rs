@@ -12,21 +12,17 @@ extern crate serde_json;
 extern crate stderrlog;
 
 mod game;
+mod gui;
 mod network;
 
 use game::*;
+use gui::*;
 use network::*;
 
 use clap::{App, Arg, ArgMatches};
 use failure::{err_msg, Error};
-use sdl2::event::Event;
-use sdl2::image::{LoadTexture, INIT_JPG, INIT_PNG};
-use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::rect::Rect;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
 
 fn main() {
     let matches = App::new("Epoch Wars")
@@ -72,56 +68,13 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let handle = thread::spawn(move || client.run());
 
     if gui {
-        sdl()?;
+        let mut g = Gui::new()?;
+        g.run();
     }
 
     handle
         .join()
         .map_err(|_| format_err!("Error while joining thread."))?;
-
-    Ok(())
-}
-
-fn sdl() -> Result<(), Error> {
-    let context = sdl2::init().map_err(err_msg)?;
-    let video = context.video().map_err(err_msg)?;
-    let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).map_err(err_msg)?;
-
-    let window = video
-        .window("Epoch Wars", 800, 600)
-        .opengl()
-        .position_centered()
-        .build()?;
-
-    let mut canvas = window.into_canvas().build()?;
-    canvas.set_draw_color(Color::RGB(0, 255, 0));
-    canvas.clear();
-    canvas.present();
-
-    let texture_creator = canvas.texture_creator();
-    let texture = texture_creator
-        .load_texture("res/preview.jpg")
-        .map_err(err_msg)?;
-
-    let mut event_pump = context.event_pump().unwrap();
-    'running: loop {
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
-                _ => {}
-            }
-        }
-        thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
-        canvas.clear();
-        canvas
-            .copy(&texture, None, Some(Rect::new(10, 10, 200, 200)))
-            .map_err(err_msg)?;
-        canvas.present();
-    }
 
     Ok(())
 }

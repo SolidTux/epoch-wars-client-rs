@@ -12,6 +12,7 @@ impl Game {
     }
 }
 
+#[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Building {
     House,
     Villa,
