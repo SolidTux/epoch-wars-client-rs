@@ -8,4 +8,5 @@ serde = "*"
 serde_json = "*"
 serde_derive = "*"
 failure = "*"
-sdl2 = "*"
+sdl2 = { version = "*", features = ["image"] }
+clap = "*"

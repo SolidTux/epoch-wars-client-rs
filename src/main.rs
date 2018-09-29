@@ -3,77 +3,67 @@ extern crate serde_derive;
 #[macro_use]
 extern crate failure;
 
+extern crate clap;
 extern crate sdl2;
 extern crate serde;
 extern crate serde_json;
 
+mod game;
+mod network;
+
+use game::*;
+use network::*;
+
+use clap::{App, Arg};
 use failure::{err_msg, Error};
 use sdl2::event::Event;
+use sdl2::image::{LoadTexture, INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
-use std::io::prelude::*;
-use std::io::{stdin, BufReader};
-use std::net::TcpStream;
+use sdl2::rect::Rect;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-#[derive(Serialize, Debug)]
-#[serde(tag = "type")]
-#[serde(rename_all = "lowercase")]
-enum Command {
-    Build {
-        x: usize,
-        y: usize,
-        building: String,
-    },
-    Excavate {
-        x: usize,
-        y: usize,
-    },
-}
-
-impl Command {
-    pub fn from_line(s: &str) -> Result<Command, Error> {
-        let parts = s.trim().split(' ').collect::<Vec<&str>>();
-        match parts.get(0) {
-            Some(&"b") => {
-                if parts.len() < 4 {
-                    Err(format_err!("Not enough arguments."))
-                } else {
-                    Ok(Command::Build {
-                        x: parts[1].parse()?,
-                        y: parts[2].parse()?,
-                        building: parts[3].to_string(),
-                    })
-                }
-            }
-            Some(&"e") => {
-                if parts.len() < 3 {
-                    Err(format_err!("Not enough arguments."))
-                } else {
-                    Ok(Command::Excavate {
-                        x: parts[1].parse()?,
-                        y: parts[2].parse()?,
-                    })
-                }
-            }
-            Some(s) => Err(format_err!("Unknown command \"{}\".", s)),
-            None => Err(format_err!("No command specified.")),
-        }
-    }
-}
-
 fn main() {
-    if let Err(err) = main_res() {
-        for e in err.iter_chain() {
-            eprintln!("{}", e);
+    let matches = App::new("Epoch Wars")
+        .about("Client for Epoch Wars.")
+        .arg(
+            Arg::with_name("gui")
+                .short("g")
+                .long("gui")
+                .help("Show GUI."),
+        )
+        .arg(
+            Arg::with_name("address")
+                .required(true)
+                .takes_value(true)
+                .help("Address of server"),
+        )
+        .get_matches();
+    let address = matches.value_of("address").unwrap_or("localhost:4200");
+    let gui = matches.is_present("gui");
+    let game = Arc::new(Mutex::new(Game::new()));
+
+    let client = EpochClient::new(&address, game.clone());
+
+    let handle = thread::spawn(move || client.run());
+
+    if gui {
+        if let Err(err) = sdl() {
+            for e in err.iter_chain() {
+                eprintln!("{}", e);
+            }
         }
     }
+
+    handle.join().expect("Error while joining thread.");
 }
 
-fn main_res() -> Result<(), Error> {
+fn sdl() -> Result<(), Error> {
     let context = sdl2::init().map_err(err_msg)?;
     let video = context.video().map_err(err_msg)?;
+    let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).map_err(err_msg)?;
 
     let window = video
         .window("Epoch Wars", 800, 600)
@@ -85,6 +75,11 @@ fn main_res() -> Result<(), Error> {
     canvas.set_draw_color(Color::RGB(0, 255, 0));
     canvas.clear();
     canvas.present();
+
+    let texture_creator = canvas.texture_creator();
+    let texture = texture_creator
+        .load_texture("res/preview.jpg")
+        .map_err(err_msg)?;
 
     let mut event_pump = context.event_pump().unwrap();
     'running: loop {
@@ -100,6 +95,9 @@ fn main_res() -> Result<(), Error> {
         }
         thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
         canvas.clear();
+        canvas
+            .copy(&texture, None, Some(Rect::new(10, 10, 200, 200)))
+            .map_err(err_msg)?;
         canvas.present();
     }
 
