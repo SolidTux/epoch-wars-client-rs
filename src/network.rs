@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
-use super::game::{Building, Game};
+use super::game::{Building, Game, ScoreEntry};
 
 pub struct EpochClient {
     address: String,
@@ -19,7 +19,7 @@ pub struct EpochClient {
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 enum Command {
     Welcome {
         name: String,
@@ -27,6 +27,7 @@ enum Command {
     Rejoin {
         token: String,
     },
+    EndTurn,
     Build {
         x: usize,
         y: usize,
@@ -48,7 +49,7 @@ enum Answer {
         rejoin: String,
     },
     EndOfTurn {
-        scores: HashMap<String, usize>,
+        scores: Vec<ScoreEntry>,
         map: Vec<MapAnswer>,
     },
     Error {
@@ -80,6 +81,7 @@ impl Command {
                     })
                 }
             }
+            Some(&"s") => Ok(Command::EndTurn),
             Some(&"e") => {
                 if parts.len() < 3 {
                     Err(format_err!("Not enough arguments."))

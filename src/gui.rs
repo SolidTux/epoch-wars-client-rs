@@ -7,6 +7,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
+use sdl2::ttf::Sdl2TtfContext;
 use sdl2::Sdl;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -19,6 +20,7 @@ pub struct Gui {
     game: Arc<Mutex<Game>>,
     size: (u32, u32),
     context: Sdl,
+    ttf_context: Sdl2TtfContext,
     canvas: WindowCanvas,
     assets: Assets,
 }
@@ -78,13 +80,12 @@ impl Gui {
         let context = sdl2::init().map_err(err_msg)?;
         let video = context.video().map_err(err_msg)?;
         let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).map_err(err_msg)?;
-        let ttf = sdl2::ttf::init().map_err(err_msg)?;
+        let ttf_context = sdl2::ttf::init().map_err(err_msg)?;
 
         let assets = Assets::new();
 
         let window = video
             .window("Epoch Wars", size.0, size.1)
-            .opengl()
             .position_centered()
             .build()?;
 
@@ -97,6 +98,7 @@ impl Gui {
             game,
             size,
             context,
+            ttf_context,
             canvas,
             assets,
         })
@@ -114,6 +116,10 @@ impl Gui {
         let texture_creator = self.canvas.texture_creator();
         let bg_texture = texture_creator
             .load_texture(&self.assets.background.path)
+            .map_err(err_msg)?;
+        let font = self
+            .ttf_context
+            .load_font(&self.assets.font, 60)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
         let mut counter = 0;
@@ -137,7 +143,7 @@ impl Gui {
                 let x = (w as f64) / (nx as f64);
                 let y = (h as f64) / (ny as f64);
                 let s = x.min(y).round() as u32;
-                let x_min = (w - s * nx) / 2;
+                let x_min = (w - s * nx);
                 let y_min = (h - s * ny) / 2;
                 for xt in 0..nx {
                     for yt in 0..ny {
@@ -159,6 +165,36 @@ impl Gui {
                         s * (1 + 2 * bs),
                     );
                     self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
+                }
+                let mut strings = Vec::new();
+                let mut f = ::std::f64::INFINITY;
+                let mut h = 0;
+                for score in &game.scores {
+                    let s = format!("{:3}: {}", score.score, score.name);
+                    let surf = font
+                        .render(&s)
+                        .blended(Color::RGB(255, 255, 255))
+                        .map_err(err_msg)?;
+                    let text = texture_creator.create_texture_from_surface(&surf).unwrap();
+                    let mut r = surf.rect();
+                    f = f.min((x_min as f64) / (r.w as f64));
+                    h = h.max(r.h);
+                    strings.push(s);
+                }
+                for (i, s) in strings.iter().enumerate() {
+                    if s.len() > 0 {
+                        let surf = font
+                            .render(&s)
+                            .blended(Color::RGB(255, 255, 255))
+                            .map_err(err_msg)?;
+                        let text = texture_creator.create_texture_from_surface(&surf).unwrap();
+                        let mut r = surf.rect();
+                        r.y += h * (i as i32);
+                        let f = (x_min as f64) / (r.w as f64);
+                        r.w = ((r.w as f64) * f).round() as i32;
+                        r.h = ((r.h as f64) * f).round() as i32;
+                        self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
+                    }
                 }
             }
             counter = counter + 1;
