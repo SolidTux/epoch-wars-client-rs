@@ -86,6 +86,7 @@ impl Assets {
 impl Gui {
     pub fn new(
         size: (u32, u32),
+        fullscreen: bool,
         tx: Sender<FromGuiMessage>,
         rx: Receiver<ToGuiMessage>,
         game: Arc<Mutex<Game>>,
@@ -97,10 +98,11 @@ impl Gui {
 
         let assets = Assets::new();
 
-        let window = video
-            .window("Epoch Wars", size.0, size.1)
-            .position_centered()
-            .build()?;
+        let mut window_builder = video.window("Epoch Wars", size.0, size.1);
+        if fullscreen {
+            window_builder.fullscreen();
+        }
+        let window = window_builder.position_centered().build()?;
 
         let mut canvas = window.into_canvas().build()?;
 
@@ -166,6 +168,14 @@ impl Gui {
                             self.canvas.window(),
                         )?;
                     }
+                    ToGuiMessage::ExcavateResult(d, b, p) => {
+                        show_simple_message_box(
+                            MessageBoxFlag::empty(),
+                            "Excavation Results",
+                            &format!("Found {:?} at depth {} on position {} {}.", b, d, p.0, p.1),
+                            self.canvas.window(),
+                        )?;
+                    }
                 }
             }
             for event in event_pump.poll_iter() {
@@ -177,6 +187,20 @@ impl Gui {
                     } => {
                         self.tx.send(FromGuiMessage::Quit)?;
                         break 'running;
+                    }
+                    Event::MouseButtonUp {
+                        mouse_btn: MouseButton::Right,
+                        x,
+                        y,
+                        ..
+                    } => {
+                        let gx = (x - (x_min as i32)) / (s as i32);
+                        let gy = (y - (y_min as i32)) / (s as i32);
+                        let gx = gx as u32;
+                        let gy = gy as u32;
+                        if (gx > 0) && (gx < nx) && (gx > 0) && (gx < nx) {
+                            self.tx.send(FromGuiMessage::Excavate((gx, gy)))?;
+                        }
                     }
                     Event::MouseButtonUp {
                         mouse_btn: MouseButton::Left,

@@ -44,6 +44,7 @@ enum Answer {
     EndOfTurn {
         scores: Vec<ScoreEntry>,
         map: Vec<MapAnswer>,
+        excavate_result: Option<ExcavateAnswer>,
     },
     Error {
         message: String,
@@ -57,6 +58,13 @@ enum Answer {
 struct MapAnswer {
     pos: (u32, u32),
     building: Building,
+}
+
+#[derive(Deserialize, Debug)]
+struct ExcavateAnswer {
+    depth: u32,
+    building: Building,
+    pos: (u32, u32),
 }
 
 impl Command {
@@ -152,12 +160,23 @@ impl EpochClient {
                                 (*g).rejoin = r.clone();
                             }
                         }
-                        Answer::EndOfTurn { scores: s, map: m } => {
+                        Answer::EndOfTurn {
+                            scores: s,
+                            map: m,
+                            excavate_result: e,
+                        } => {
                             if let Ok(mut g) = game.lock() {
                                 (*g).scores = s;
                                 (*g).buildings.clear();
                                 for e in m {
                                     (*g).buildings.insert(e.pos, e.building);
+                                }
+                                if let Some(er) = e {
+                                    tx.send(ToGuiMessage::ExcavateResult(
+                                        er.depth,
+                                        er.building,
+                                        er.pos,
+                                    ))?;
                                 }
                             }
                         }
@@ -182,14 +201,28 @@ impl EpochClient {
 
     fn run_res(&self) -> Result<(), Error> {
         debug!("Connecting to address: {}", self.address);
-        let mut stream = TcpStream::connect_timeout(
-            &self
-                .address
-                .to_socket_addrs()?
-                .next()
-                .ok_or(format_err!("Error while parsing address."))?,
-            Duration::from_millis(2000),
-        )?;
+        let mut stream = {
+            let tmp = TcpStream::connect_timeout(
+                &self
+                    .address
+                    .to_socket_addrs()?
+                    .next()
+                    .ok_or(format_err!("Error while parsing address."))?,
+                Duration::from_millis(2000),
+            )?;
+            let mut line = String::new();
+            let mut reader = BufReader::new(tmp);
+            reader.read_line(&mut line)?;
+            debug!("Using server {}", line.trim());
+            TcpStream::connect_timeout(
+                &line
+                    .trim()
+                    .to_socket_addrs()?
+                    .next()
+                    .ok_or(format_err!("Error while parsing address."))?,
+                Duration::from_millis(2000),
+            )?
+        };
         stream.set_write_timeout(Some(Duration::from_millis(1000)))?;
         debug!("Connected.");
         let reader = BufReader::new(stream.try_clone()?);
@@ -208,12 +241,16 @@ impl EpochClient {
             }.send(&mut stream)?;
         }
         while let Ok(msg) = self.rx.recv() {
+            trace!("Got message from GUI: {:?}", msg);
             match msg {
                 FromGuiMessage::Build(pos, building) => Command::Build {
                     x: pos.0,
                     y: pos.1,
                     building,
                 }.send(&mut stream)?,
+                FromGuiMessage::Excavate(pos) => {
+                    Command::Excavate { x: pos.0, y: pos.1 }.send(&mut stream)?
+                }
                 FromGuiMessage::Quit => break,
             }
         }
