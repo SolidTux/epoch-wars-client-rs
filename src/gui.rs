@@ -36,6 +36,7 @@ struct Assets {
     buildings: HashMap<Building, Sprite>,
     font: String,
     background: Sprite,
+    excavation: Sprite,
 }
 
 #[derive(Clone)]
@@ -77,6 +78,10 @@ impl Assets {
             background: Sprite {
                 size: 1,
                 path: "res/bg.png".to_string(),
+            },
+            excavation: Sprite {
+                size: 1,
+                path: "res/ex.png".to_string(),
             },
         }
     }
@@ -134,6 +139,9 @@ impl Gui {
         let bg_texture = texture_creator
             .load_texture(&self.assets.background.path)
             .map_err(err_msg)?;
+        let ex_texture = texture_creator
+            .load_texture(&self.assets.excavation.path)
+            .map_err(err_msg)?;
         let font = self
             .ttf_context
             .load_font(&self.assets.font, 60)
@@ -156,6 +164,8 @@ impl Gui {
             let eg = (ew * 1 / 10) as i32;
             (nx, ny, s, x_min, y_min, ew, eg)
         };
+
+        let mut excavation_position = None;
         'running: loop {
             if let Ok(msg) = self.rx.try_recv() {
                 match msg {
@@ -208,6 +218,7 @@ impl Gui {
                         let gy = gy as u32;
                         if (gx > 0) && (gx < nx) && (gx > 0) && (gx < nx) {
                             self.tx.send(FromGuiMessage::Excavate((gx, gy)))?;
+                            excavation_position = Some((gx, gy));
                         }
                     }
                     Event::MouseButtonUp {
@@ -269,9 +280,18 @@ impl Gui {
                 for xt in 0..nx {
                     for yt in 0..ny {
                         let r = Rect::new((x_min + s * xt) as i32, (y_min + s * yt) as i32, s, s);
-                        self.canvas
-                            .copy(&bg_texture, None, Some(r))
-                            .map_err(err_msg)?;
+                        if excavation_position
+                            .map(|(x, y)| (x == xt) && (y == yt))
+                            .unwrap_or(false)
+                        {
+                            self.canvas
+                                .copy(&ex_texture, None, Some(r))
+                                .map_err(err_msg)?;
+                        } else {
+                            self.canvas
+                                .copy(&bg_texture, None, Some(r))
+                                .map_err(err_msg)?;
+                        }
                     }
                 }
                 for (pos, building) in &game.buildings {
