@@ -111,7 +111,10 @@ impl EpochClient {
             let game = self.game.clone();
             thread::spawn(move || {
                 let mut line = String::new();
-                while reader.read_line(&mut line).is_ok() {
+                while let Ok(len) = reader.read_line(&mut line) {
+                    if len == 0 {
+                        break;
+                    }
                     trace!("{}", line.trim());
                     match serde_json::from_str::<Answer>(&line.trim()) {
                         Ok(a) => {
@@ -145,7 +148,10 @@ impl EpochClient {
                                 _ => warn!("Unimplemented answer type received."),
                             }
                         }
-                        Err(e) => warn!("{}", e),
+                        Err(e) => {
+                            trace!("{:?}", e);
+                            warn!("{}", e)
+                        }
                     }
                     line.clear()
                 }
