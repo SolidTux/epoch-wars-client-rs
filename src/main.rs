@@ -13,6 +13,7 @@ extern crate stderrlog;
 
 mod game;
 mod gui;
+mod message;
 mod network;
 
 use game::*;
@@ -21,7 +22,7 @@ use network::*;
 
 use clap::{App, Arg, ArgMatches};
 use failure::Error;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
 fn main() {
@@ -33,12 +34,6 @@ fn main() {
                 .long("name")
                 .takes_value(true)
                 .help("Player name."),
-        )
-        .arg(
-            Arg::with_name("gui")
-                .short("g")
-                .long("gui")
-                .help("Show GUI."),
         )
         .arg(
             Arg::with_name("verbosity")
@@ -78,14 +73,18 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let gui = matches.is_present("gui");
     let game = Arc::new(Mutex::new(Game::new()));
 
-    let client = EpochClient::new(&address, &name, matches.value_of("token"), game.clone());
-
+    let (tx_gui, rx_net) = mpsc::channel();
+    let client = EpochClient::new(
+        &address,
+        &name,
+        matches.value_of("token"),
+        rx_net,
+        game.clone(),
+    );
     let handle = thread::spawn(move || client.run());
 
-    if gui {
-        let mut g = Gui::new((800, 600), game.clone())?;
-        g.run();
-    }
+    let mut g = Gui::new((800, 600), tx_gui, game.clone())?;
+    g.run();
 
     handle
         .join()

@@ -4,17 +4,20 @@ use sdl2;
 use sdl2::event::Event;
 use sdl2::image::{LoadTexture, INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
+use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use sdl2::ttf::Sdl2TtfContext;
 use sdl2::Sdl;
 use std::collections::HashMap;
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use super::game::{Building, Game};
+use super::message::FromGuiMessage;
 
 pub struct Gui {
     game: Arc<Mutex<Game>>,
@@ -23,6 +26,7 @@ pub struct Gui {
     ttf_context: Sdl2TtfContext,
     canvas: WindowCanvas,
     assets: Assets,
+    tx: Sender<FromGuiMessage>,
 }
 
 struct Assets {
@@ -76,7 +80,11 @@ impl Assets {
 }
 
 impl Gui {
-    pub fn new(size: (u32, u32), game: Arc<Mutex<Game>>) -> Result<Gui, Error> {
+    pub fn new(
+        size: (u32, u32),
+        tx: Sender<FromGuiMessage>,
+        game: Arc<Mutex<Game>>,
+    ) -> Result<Gui, Error> {
         let context = sdl2::init().map_err(err_msg)?;
         let video = context.video().map_err(err_msg)?;
         let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).map_err(err_msg)?;
@@ -101,6 +109,7 @@ impl Gui {
             ttf_context,
             canvas,
             assets,
+            tx,
         })
     }
 
@@ -123,6 +132,18 @@ impl Gui {
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
         let mut counter = 0;
+        let (w, h) = self.size;
+        let (mut nx, mut ny, mut s, mut x_min, mut y_min) = {
+            let game = self
+                .game
+                .lock()
+                .map_err(|_| format_err!("Error while locking Mutex."))?;
+            let (nx, ny) = game.size;
+            let x = (w as f64) / (nx as f64);
+            let y = (h as f64) / (ny as f64);
+            let s = x.min(y).round() as u32;
+            (nx, ny, s, w - s * nx, (h - s * ny) / 2)
+        };
         'running: loop {
             for event in event_pump.poll_iter() {
                 match event {
@@ -131,6 +152,22 @@ impl Gui {
                         keycode: Some(Keycode::Escape),
                         ..
                     } => break 'running,
+                    Event::MouseButtonUp {
+                        mouse_btn: MouseButton::Left,
+                        x,
+                        y,
+                        ..
+                    } => {
+                        let gx = (x - (x_min as i32)) / (s as i32);
+                        let gy = (y - (y_min as i32)) / (s as i32);
+                        debug!("Mouse in {} {}", gx, gy);
+                        let gx = gx as u32;
+                        let gy = gy as u32;
+                        if (gx > 0) && (gx < nx) && (gx > 0) && (gx < nx) {
+                            self.tx
+                                .send(FromGuiMessage::Build((gx, gy), Building::House));
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -138,13 +175,13 @@ impl Gui {
             self.canvas.set_draw_color(Color::RGB(50, 50, 50));
             self.canvas.clear();
             if let Ok(game) = self.game.lock() {
-                let (w, h) = self.size;
-                let (nx, ny) = game.size;
+                nx = game.size.0;
+                ny = game.size.1;
                 let x = (w as f64) / (nx as f64);
                 let y = (h as f64) / (ny as f64);
-                let s = x.min(y).round() as u32;
-                let x_min = (w - s * nx);
-                let y_min = (h - s * ny) / 2;
+                s = x.min(y).round() as u32;
+                x_min = w - s * nx;
+                y_min = (h - s * ny) / 2;
                 for xt in 0..nx {
                     for yt in 0..ny {
                         let r = Rect::new((x_min + s * xt) as i32, (y_min + s * yt) as i32, s, s);

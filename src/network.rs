@@ -4,39 +4,31 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{stdin, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use super::game::{Building, Game, ScoreEntry};
+use super::message::FromGuiMessage;
 
 pub struct EpochClient {
     address: String,
     name: String,
     token: Option<String>,
     game: Arc<Mutex<Game>>,
+    rx: Receiver<FromGuiMessage>,
 }
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 enum Command {
-    Welcome {
-        name: String,
-    },
-    Rejoin {
-        token: String,
-    },
+    Welcome { name: String },
+    Rejoin { token: String },
     EndTurn,
-    Build {
-        x: usize,
-        y: usize,
-        building: String,
-    },
-    Excavate {
-        x: usize,
-        y: usize,
-    },
+    Build { x: u32, y: u32, building: Building },
+    Excavate { x: u32, y: u32 },
 }
 
 #[derive(Deserialize, Debug)]
@@ -77,7 +69,7 @@ impl Command {
                     Ok(Command::Build {
                         x: parts[1].parse()?,
                         y: parts[2].parse()?,
-                        building: parts[3].to_string(),
+                        building: parts[3].parse()?,
                     })
                 }
             }
@@ -110,6 +102,7 @@ impl EpochClient {
         address: &str,
         name: &str,
         token: Option<&str>,
+        rx: Receiver<FromGuiMessage>,
         game: Arc<Mutex<Game>>,
     ) -> EpochClient {
         EpochClient {
@@ -117,6 +110,7 @@ impl EpochClient {
             name: name.to_string(),
             token: token.map(|x| x.to_string()),
             game,
+            rx,
         }
     }
 
@@ -176,7 +170,6 @@ impl EpochClient {
             }
             line.clear()
         }
-        Ok(())
     }
 
     fn run_res(&self) -> Result<(), Error> {
@@ -196,7 +189,6 @@ impl EpochClient {
             let game = self.game.clone();
             thread::spawn(move || EpochClient::listen(reader, game))
         };
-
         let mut reader = BufReader::new(stdin());
         let mut line = String::new();
         if let Some(ref t) = self.token {
@@ -206,19 +198,29 @@ impl EpochClient {
                 name: self.name.clone(),
             }.send(&mut stream)?;
         }
-        while reader.read_line(&mut line).is_ok() {
-            match Command::from_line(&line) {
-                Ok(cmd) => {
-                    cmd.send(&mut stream);
-                }
-                Err(err) => {
-                    for e in err.iter_chain() {
-                        error!("{}", e);
-                    }
-                }
+        while let Ok(msg) = self.rx.recv() {
+            match msg {
+                FromGuiMessage::Build(pos, building) => Command::Build {
+                    x: pos.0,
+                    y: pos.1,
+                    building,
+                }.send(&mut stream)?,
             }
-            line.clear();
         }
+
+        //while reader.read_line(&mut line).is_ok() {
+        //match Command::from_line(&line) {
+        //Ok(cmd) => {
+        //cmd.send(&mut stream);
+        //}
+        //Err(err) => {
+        //for e in err.iter_chain() {
+        //error!("{}", e);
+        //}
+        //}
+        //}
+        //line.clear();
+        //}
 
         handle
             .join()

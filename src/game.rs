@@ -1,3 +1,4 @@
+use failure::Error;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -12,7 +13,7 @@ pub struct Game {
 #[derive(Debug, Deserialize)]
 pub struct ScoreEntry {
     pub name: String,
-    pub score: usize,
+    pub score: isize,
 }
 
 impl Game {
@@ -27,10 +28,22 @@ impl Game {
     }
 }
 
-#[derive(Clone, Deserialize, Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Debug, Hash, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Building {
     House,
     Villa,
     Tower,
+}
+
+impl ::std::str::FromStr for Building {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Building, Error> {
+        match s.to_lowercase().as_str() {
+            "house" => Ok(Building::House),
+            "villa" => Ok(Building::Villa),
+            "tower" => Ok(Building::Tower),
+            _ => Err(format_err!("Unknown building type.")),
+        }
+    }
 }
