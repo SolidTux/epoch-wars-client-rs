@@ -2,11 +2,14 @@
 extern crate serde_derive;
 #[macro_use]
 extern crate failure;
+#[macro_use]
+extern crate log;
 
 extern crate clap;
 extern crate sdl2;
 extern crate serde;
 extern crate serde_json;
+extern crate stderrlog;
 
 mod game;
 mod network;
@@ -14,7 +17,7 @@ mod network;
 use game::*;
 use network::*;
 
-use clap::{App, Arg};
+use clap::{App, Arg, ArgMatches};
 use failure::{err_msg, Error};
 use sdl2::event::Event;
 use sdl2::image::{LoadTexture, INIT_JPG, INIT_PNG};
@@ -35,12 +38,31 @@ fn main() {
                 .help("Show GUI."),
         )
         .arg(
+            Arg::with_name("verbosity")
+                .short("v")
+                .multiple(true)
+                .help("Increase verbosity. Can be specified multiple times."),
+        )
+        .arg(
             Arg::with_name("address")
                 .required(true)
                 .takes_value(true)
                 .help("Address of server"),
         )
         .get_matches();
+    stderrlog::new()
+        .verbosity(matches.occurrences_of("verbosity") as usize)
+        .init()
+        .unwrap();
+
+    if let Err(err) = main_res(matches) {
+        for e in err.iter_chain() {
+            error!("{}", e);
+        }
+    }
+}
+
+fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let address = matches.value_of("address").unwrap_or("localhost:4200");
     let gui = matches.is_present("gui");
     let game = Arc::new(Mutex::new(Game::new()));
@@ -50,14 +72,14 @@ fn main() {
     let handle = thread::spawn(move || client.run());
 
     if gui {
-        if let Err(err) = sdl() {
-            for e in err.iter_chain() {
-                eprintln!("{}", e);
-            }
-        }
+        sdl()?;
     }
 
-    handle.join().expect("Error while joining thread.");
+    handle
+        .join()
+        .map_err(|_| format_err!("Error while joining thread."))?;
+
+    Ok(())
 }
 
 fn sdl() -> Result<(), Error> {

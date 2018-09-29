@@ -10,3 +10,5 @@ serde_derive = "*"
 failure = "*"
 sdl2 = { version = "*", features = ["image"] }
 clap = "*"
+log = "*"
+stderrlog = "*"

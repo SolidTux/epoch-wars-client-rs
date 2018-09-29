@@ -70,12 +70,13 @@ impl EpochClient {
     pub fn run(&self) {
         if let Err(err) = self.run_res() {
             for e in err.iter_chain() {
-                eprintln!("{}", e);
+                error!("{}", e);
             }
         }
     }
 
     fn run_res(&self) -> Result<(), Error> {
+        debug!("Connecting to address: {}", self.address);
         let mut stream = TcpStream::connect(&self.address)?;
         let mut reader = BufReader::new(stream.try_clone()?);
         let handle = thread::spawn(move || {
@@ -97,7 +98,7 @@ impl EpochClient {
                 }
                 Err(err) => {
                     for e in err.iter_chain() {
-                        eprintln!("{}", e);
+                        error!("{}", e);
                     }
                 }
             }
