@@ -7,3 +7,4 @@ authors = ["Daniel Hauck <mail@dhauck.eu>"]
 serde = "*"
 serde_json = "*"
 serde_derive = "*"
+failure = "*"
