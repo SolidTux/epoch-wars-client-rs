@@ -87,10 +87,5 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
 
     let mut g = Gui::new((800, 600), false, tx_gui, rx_gui, game.clone())?;
     g.run();
-
-    handle
-        .join()
-        .map_err(|_| format_err!("Error while joining thread."))?;
-
     Ok(())
 }

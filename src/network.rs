@@ -208,7 +208,7 @@ impl EpochClient {
                     .to_socket_addrs()?
                     .next()
                     .ok_or(format_err!("Error while parsing address."))?,
-                Duration::from_millis(2000),
+                Duration::from_millis(20000),
             )?;
             let mut line = String::new();
             let mut reader = BufReader::new(tmp);
@@ -220,7 +220,7 @@ impl EpochClient {
                     .to_socket_addrs()?
                     .next()
                     .ok_or(format_err!("Error while parsing address."))?,
-                Duration::from_millis(2000),
+                Duration::from_millis(20000),
             )?
         };
         stream.set_write_timeout(Some(Duration::from_millis(1000)))?;
@@ -254,10 +254,6 @@ impl EpochClient {
                 FromGuiMessage::Quit => break,
             }
         }
-
-        handle
-            .join()
-            .map_err(|_| format_err!("Error while joining thread."))?;
         Ok(())
     }
 }
