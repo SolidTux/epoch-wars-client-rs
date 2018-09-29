@@ -1,0 +1,9 @@
+[package]
+name = "epoch-wars-client-rs"
+version = "0.1.0"
+authors = ["Daniel Hauck <mail@dhauck.eu>"]
+
+[dependencies]
+serde = "*"
+serde_json = "*"
+serde_derive = "*"
