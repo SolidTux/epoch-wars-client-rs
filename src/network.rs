@@ -62,7 +62,7 @@ struct MapAnswer {
 
 #[derive(Deserialize, Debug)]
 struct ExcavateAnswer {
-    depth: u32,
+    depth: i32,
     building: Building,
     pos: (u32, u32),
 }
