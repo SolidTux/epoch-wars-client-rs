@@ -166,6 +166,7 @@ impl Gui {
         };
 
         let mut excavation_position = None;
+        let mut temp_building = None;
         'running: loop {
             if let Ok(msg) = self.rx.try_recv() {
                 match msg {
@@ -238,6 +239,7 @@ impl Gui {
                                 2 => Building::Tower,
                                 _ => Building::House,
                             };
+                            temp_building = Some(((gx, gy), building.clone()));
                             self.tx.send(FromGuiMessage::Build((gx, gy), building))?;
                         } else if (x < (x_min as i32)) && (y > ((h as i32) - ew)) {
                             self.active = (x / ew) as usize;
@@ -298,6 +300,20 @@ impl Gui {
                     let texture = texture_creator
                         .load_texture(&self.assets.buildings[&building].path)
                         .map_err(err_msg)?;
+                    let bs = &self.assets.buildings[&building].size;
+                    let r = Rect::new(
+                        (x_min + s * (pos.0 - bs)) as i32,
+                        (y_min + s * (pos.1 - bs)) as i32,
+                        s * (1 + 2 * bs),
+                        s * (1 + 2 * bs),
+                    );
+                    self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
+                }
+                if let Some((pos, building)) = &temp_building {
+                    let mut texture = texture_creator
+                        .load_texture(&self.assets.buildings[&building].path)
+                        .map_err(err_msg)?;
+                    texture.set_alpha_mod(127);
                     let bs = &self.assets.buildings[&building].size;
                     let r = Rect::new(
                         (x_min + s * (pos.0 - bs)) as i32,
