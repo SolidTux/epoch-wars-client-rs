@@ -1,5 +1,6 @@
 use failure::Error;
 use serde_json;
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{stdin, BufReader};
 use std::net::TcpStream;
@@ -10,6 +11,7 @@ use super::game::{Building, Game};
 
 pub struct EpochClient {
     address: String,
+    name: String,
     game: Arc<Mutex<Game>>,
 }
 
@@ -17,7 +19,9 @@ pub struct EpochClient {
 #[serde(tag = "type")]
 #[serde(rename_all = "lowercase")]
 enum Command {
-    Welcome,
+    Welcome {
+        name: String,
+    },
     Build {
         x: usize,
         y: usize,
@@ -39,7 +43,7 @@ enum Answer {
         rejoin: String,
     },
     EndOfTurn {
-        scores: Vec<usize>,
+        scores: HashMap<String, usize>,
         map: Vec<MapAnswer>,
     },
     Error {
@@ -88,9 +92,10 @@ impl Command {
 }
 
 impl EpochClient {
-    pub fn new(address: &str, game: Arc<Mutex<Game>>) -> EpochClient {
+    pub fn new(address: &str, name: &str, game: Arc<Mutex<Game>>) -> EpochClient {
         EpochClient {
             address: address.to_string(),
+            name: name.to_string(),
             game,
         }
     }
@@ -131,8 +136,9 @@ impl EpochClient {
                                         (*g).rejoin = r.clone();
                                     }
                                 }
-                                Answer::EndOfTurn { scores: _, map: m } => {
+                                Answer::EndOfTurn { scores: s, map: m } => {
                                     if let Ok(mut g) = game.lock() {
+                                        (*g).scores = s;
                                         (*g).buildings.clear();
                                         for e in m {
                                             (*g).buildings.insert(e.pos, e.building);
@@ -160,7 +166,9 @@ impl EpochClient {
 
         let mut reader = BufReader::new(stdin());
         let mut line = String::new();
-        let s = serde_json::to_string(&Command::Welcome)?;
+        let s = serde_json::to_string(&Command::Welcome {
+            name: self.name.clone(),
+        })?;
         writeln!(&mut stream, "{}", s)?;
         while reader.read_line(&mut line).is_ok() {
             match Command::from_line(&line) {

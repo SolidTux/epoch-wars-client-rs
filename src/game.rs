@@ -4,6 +4,7 @@ use std::collections::HashMap;
 pub struct Game {
     pub player: Option<usize>,
     pub size: (u32, u32),
+    pub scores: HashMap<String, usize>,
     pub buildings: HashMap<(u32, u32), Building>,
     pub rejoin: String,
 }
@@ -13,6 +14,7 @@ impl Game {
         Game {
             player: None,
             size: (5, 5),
+            scores: HashMap::new(),
             buildings: HashMap::new(),
             rejoin: String::new(),
         }

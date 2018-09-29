@@ -28,6 +28,13 @@ fn main() {
     let matches = App::new("Epoch Wars")
         .about("Client for Epoch Wars.")
         .arg(
+            Arg::with_name("name")
+                .short("n")
+                .long("name")
+                .takes_value(true)
+                .help("Player name."),
+        )
+        .arg(
             Arg::with_name("gui")
                 .short("g")
                 .long("gui")
@@ -60,10 +67,11 @@ fn main() {
 
 fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let address = matches.value_of("address").unwrap_or("localhost:4200");
+    let name = matches.value_of("name").unwrap_or("Noname");
     let gui = matches.is_present("gui");
     let game = Arc::new(Mutex::new(Game::new()));
 
-    let client = EpochClient::new(&address, game.clone());
+    let client = EpochClient::new(&address, &name, game.clone());
 
     let handle = thread::spawn(move || client.run());
 
