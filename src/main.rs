@@ -3,14 +3,19 @@ extern crate serde_derive;
 #[macro_use]
 extern crate failure;
 
+extern crate sdl2;
 extern crate serde;
 extern crate serde_json;
 
-use failure::Error;
+use failure::{err_msg, Error};
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::Color;
 use std::io::prelude::*;
 use std::io::{stdin, BufReader};
 use std::net::TcpStream;
 use std::thread;
+use std::time::Duration;
 
 #[derive(Serialize, Debug)]
 #[serde(tag = "type")]
@@ -67,36 +72,36 @@ fn main() {
 }
 
 fn main_res() -> Result<(), Error> {
-    let mut stream = TcpStream::connect("localhost:4200")?;
-    let mut reader = BufReader::new(stream.try_clone()?);
-    let handle = thread::spawn(move || {
-        let mut line = String::new();
-        while reader.read_line(&mut line).is_ok() {
-            print!("{}", line.replace(";", "\n"));
-            line.clear()
-        }
-    });
+    let context = sdl2::init().map_err(err_msg)?;
+    let video = context.video().map_err(err_msg)?;
 
-    let mut reader = BufReader::new(stdin());
-    let mut line = String::new();
-    while reader.read_line(&mut line).is_ok() {
-        match Command::from_line(&line) {
-            Ok(cmd) => {
-                let s = serde_json::to_string(&cmd)?;
-                println!("{}", s);
-                writeln!(&mut stream, "{}", s)?;
-            }
-            Err(err) => {
-                for e in err.iter_chain() {
-                    eprintln!("{}", e);
-                }
+    let window = video
+        .window("Epoch Wars", 800, 600)
+        .opengl()
+        .position_centered()
+        .build()?;
+
+    let mut canvas = window.into_canvas().build()?;
+    canvas.set_draw_color(Color::RGB(0, 255, 0));
+    canvas.clear();
+    canvas.present();
+
+    let mut event_pump = context.event_pump().unwrap();
+    'running: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. }
+                | Event::KeyDown {
+                    keycode: Some(Keycode::Escape),
+                    ..
+                } => break 'running,
+                _ => {}
             }
         }
-        line.clear();
+        thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        canvas.clear();
+        canvas.present();
     }
 
-    handle
-        .join()
-        .map_err(|_| format_err!("Error while joining thread."))?;
     Ok(())
 }
