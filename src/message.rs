@@ -11,4 +11,6 @@ pub enum FromGuiMessage {
 pub enum ToGuiMessage {
     Message(String, String),
     ExcavateResult(i32, Option<Building>, (u32, u32)),
+    ClearExcavate,
+    ClearBuilding,
 }

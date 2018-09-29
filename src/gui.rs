@@ -195,6 +195,8 @@ impl Gui {
                             self.canvas.window(),
                         )?,
                     },
+                    ToGuiMessage::ClearBuilding => temp_building = None,
+                    ToGuiMessage::ClearExcavate => excavation_position = None,
                 }
             }
             for event in event_pump.poll_iter() {
@@ -232,13 +234,14 @@ impl Gui {
                         let gy = (y - (y_min as i32)) / (s as i32);
                         let gx = gx as u32;
                         let gy = gy as u32;
-                        if (gx > 0) && (gx < nx) && (gx > 0) && (gx < nx) {
-                            let building = match self.active {
-                                0 => Building::House,
-                                1 => Building::Villa,
-                                2 => Building::Tower,
-                                _ => Building::House,
-                            };
+                        let building = match self.active {
+                            0 => Building::House,
+                            1 => Building::Villa,
+                            2 => Building::Tower,
+                            _ => Building::House,
+                        };
+                        let bs = self.assets.buildings[&building].size;
+                        if (gx > bs) && (gx < (nx - bs)) && (gx > bs) && (gx < (nx - bs)) {
                             temp_building = Some(((gx, gy), building.clone()));
                             self.tx.send(FromGuiMessage::Build((gx, gy), building))?;
                         } else if (x < (x_min as i32)) && (y > ((h as i32) - ew)) {

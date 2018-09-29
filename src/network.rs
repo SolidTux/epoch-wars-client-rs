@@ -47,6 +47,7 @@ enum Answer {
     },
     Error {
         message: String,
+        subtype: Option<String>,
     },
     Debug {
         message: String,
@@ -134,6 +135,8 @@ impl EpochClient {
                             map: m,
                             excavate_result: e,
                         } => {
+                            tx.send(ToGuiMessage::ClearBuilding)?;
+                            tx.send(ToGuiMessage::ClearExcavate)?;
                             if let Ok(mut g) = game.lock() {
                                 (*g).scores = s;
                                 (*g).buildings.clear();
@@ -152,9 +155,16 @@ impl EpochClient {
                         Answer::Debug { message: msg } => {
                             info!("Debug message from server: \n{}", msg)
                         }
-                        Answer::Error { message: msg } => {
+                        Answer::Error {
+                            message: msg,
+                            subtype: st,
+                        } => {
                             error!("Error message from server: \n{}", msg);
                             tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
+                            match st {
+                                Some(s) => trace!("Got error subtype {}", s),
+                                None => {}
+                            }
                         }
                         _ => warn!("Unimplemented answer type received."),
                     }
