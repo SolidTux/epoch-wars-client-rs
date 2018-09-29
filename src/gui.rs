@@ -135,7 +135,7 @@ impl Gui {
         let mut event_pump = self.context.event_pump().unwrap();
         let mut counter = 0;
         let (w, h) = self.size;
-        let (mut nx, mut ny, mut s, mut x_min, mut y_min) = {
+        let (mut nx, mut ny, mut s, mut x_min, mut y_min, mut ew, mut eg) = {
             let game = self
                 .game
                 .lock()
@@ -144,7 +144,11 @@ impl Gui {
             let x = (w as f64) / (nx as f64);
             let y = (h as f64) / (ny as f64);
             let s = x.min(y).round() as u32;
-            (nx, ny, s, w - s * nx, (h - s * ny) / 2)
+            let x_min = w - s * nx;
+            let y_min = (h - s * ny) / 2;
+            let ew = (x_min / 3) as i32;
+            let eg = (ew * 1 / 10) as i32;
+            (nx, ny, s, x_min, y_min, ew, eg)
         };
         'running: loop {
             for event in event_pump.poll_iter() {
@@ -165,12 +169,19 @@ impl Gui {
                     } => {
                         let gx = (x - (x_min as i32)) / (s as i32);
                         let gy = (y - (y_min as i32)) / (s as i32);
-                        debug!("Mouse in {} {}", gx, gy);
                         let gx = gx as u32;
                         let gy = gy as u32;
                         if (gx > 0) && (gx < nx) && (gx > 0) && (gx < nx) {
-                            self.tx
-                                .send(FromGuiMessage::Build((gx, gy), Building::House));
+                            let building = match self.active {
+                                0 => Building::House,
+                                1 => Building::Villa,
+                                2 => Building::Tower,
+                                _ => Building::House,
+                            };
+                            self.tx.send(FromGuiMessage::Build((gx, gy), building))?;
+                        } else if (x < (x_min as i32)) && (y > ((h as i32) - ew)) {
+                            self.active = (x / ew) as usize;
+                            debug!("Element {} active.", self.active);
                         }
                     }
                     _ => {}
@@ -179,8 +190,6 @@ impl Gui {
             thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
             self.canvas.set_draw_color(Color::RGB(50, 50, 50));
             self.canvas.clear();
-            let ew = (x_min / 3) as i32;
-            let eg = (ew * 1 / 10) as i32;
             for (i, building) in [Building::House, Building::Villa, Building::Tower]
                 .iter()
                 .enumerate()
