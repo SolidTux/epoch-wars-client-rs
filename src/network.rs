@@ -1,6 +1,5 @@
 use failure::Error;
 use serde_json;
-use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{stdin, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -63,41 +62,11 @@ struct MapAnswer {
 #[derive(Deserialize, Debug)]
 struct ExcavateAnswer {
     depth: i32,
-    building: Building,
+    building: Option<Building>,
     pos: (u32, u32),
 }
 
 impl Command {
-    pub fn from_line(s: &str) -> Result<Command, Error> {
-        let parts = s.trim().split(' ').collect::<Vec<&str>>();
-        match parts.get(0) {
-            Some(&"b") => {
-                if parts.len() < 4 {
-                    Err(format_err!("Not enough arguments."))
-                } else {
-                    Ok(Command::Build {
-                        x: parts[1].parse()?,
-                        y: parts[2].parse()?,
-                        building: parts[3].parse()?,
-                    })
-                }
-            }
-            Some(&"s") => Ok(Command::EndTurn),
-            Some(&"e") => {
-                if parts.len() < 3 {
-                    Err(format_err!("Not enough arguments."))
-                } else {
-                    Ok(Command::Excavate {
-                        x: parts[1].parse()?,
-                        y: parts[2].parse()?,
-                    })
-                }
-            }
-            Some(s) => Err(format_err!("Unknown command \"{}\".", s)),
-            None => Err(format_err!("No command specified.")),
-        }
-    }
-
     pub fn send(&self, stream: &mut TcpStream) -> Result<(), Error> {
         let s = serde_json::to_string(self)?;
         trace!("Sending: {}", s);

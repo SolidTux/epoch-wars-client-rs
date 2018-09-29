@@ -10,5 +10,5 @@ pub enum FromGuiMessage {
 #[derive(Debug)]
 pub enum ToGuiMessage {
     Message(String, String),
-    ExcavateResult(i32, Building, (u32, u32)),
+    ExcavateResult(i32, Option<Building>, (u32, u32)),
 }

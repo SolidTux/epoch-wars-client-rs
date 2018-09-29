@@ -10,7 +10,6 @@ use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use sdl2::ttf::Sdl2TtfContext;
-use sdl2::video::Window;
 use sdl2::Sdl;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -168,14 +167,23 @@ impl Gui {
                             self.canvas.window(),
                         )?;
                     }
-                    ToGuiMessage::ExcavateResult(d, b, p) => {
-                        show_simple_message_box(
+                    ToGuiMessage::ExcavateResult(d, b, p) => match b {
+                        Some(building) => show_simple_message_box(
                             MessageBoxFlag::empty(),
                             "Excavation Results",
-                            &format!("Found {:?} at depth {} on position {} {}.", b, d, p.0, p.1),
+                            &format!(
+                                "Found {:?} at depth {} on position {}, {}.",
+                                building, d, p.0, p.1
+                            ),
                             self.canvas.window(),
-                        )?;
-                    }
+                        )?,
+                        None => show_simple_message_box(
+                            MessageBoxFlag::empty(),
+                            "Excavation Results",
+                            &format!("Found nothing at position {}, {}.", p.0, p.1),
+                            self.canvas.window(),
+                        )?,
+                    },
                 }
             }
             for event in event_pump.poll_iter() {
@@ -246,7 +254,7 @@ impl Gui {
                 );
                 if i == self.active {
                     self.canvas.set_draw_color(Color::RGB(255, 0, 0));
-                    self.canvas.fill_rect(r);
+                    self.canvas.fill_rect(r).map_err(err_msg)?;
                 }
                 self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
             }
