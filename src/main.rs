@@ -74,16 +74,18 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let game = Arc::new(Mutex::new(Game::new()));
 
     let (tx_gui, rx_net) = mpsc::channel();
+    let (tx_net, rx_gui) = mpsc::channel();
     let client = EpochClient::new(
         &address,
         &name,
         matches.value_of("token"),
+        tx_net,
         rx_net,
         game.clone(),
     );
     let handle = thread::spawn(move || client.run());
 
-    let mut g = Gui::new((800, 600), tx_gui, game.clone())?;
+    let mut g = Gui::new((800, 600), tx_gui, rx_gui, game.clone())?;
     g.run();
 
     handle

@@ -4,20 +4,22 @@ use sdl2;
 use sdl2::event::Event;
 use sdl2::image::{LoadTexture, INIT_JPG, INIT_PNG};
 use sdl2::keyboard::Keycode;
+use sdl2::messagebox::{show_simple_message_box, MessageBoxFlag};
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use sdl2::ttf::Sdl2TtfContext;
+use sdl2::video::Window;
 use sdl2::Sdl;
 use std::collections::HashMap;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use super::game::{Building, Game};
-use super::message::FromGuiMessage;
+use super::message::{FromGuiMessage, ToGuiMessage};
 
 pub struct Gui {
     game: Arc<Mutex<Game>>,
@@ -28,6 +30,7 @@ pub struct Gui {
     assets: Assets,
     active: usize,
     tx: Sender<FromGuiMessage>,
+    rx: Receiver<ToGuiMessage>,
 }
 
 struct Assets {
@@ -84,6 +87,7 @@ impl Gui {
     pub fn new(
         size: (u32, u32),
         tx: Sender<FromGuiMessage>,
+        rx: Receiver<ToGuiMessage>,
         game: Arc<Mutex<Game>>,
     ) -> Result<Gui, Error> {
         let context = sdl2::init().map_err(err_msg)?;
@@ -112,6 +116,7 @@ impl Gui {
             canvas,
             assets,
             tx,
+            rx,
         })
     }
 
@@ -151,6 +156,18 @@ impl Gui {
             (nx, ny, s, x_min, y_min, ew, eg)
         };
         'running: loop {
+            if let Ok(msg) = self.rx.try_recv() {
+                match msg {
+                    ToGuiMessage::Message(t, s) => {
+                        show_simple_message_box(
+                            MessageBoxFlag::empty(),
+                            &t,
+                            &s,
+                            self.canvas.window(),
+                        )?;
+                    }
+                }
+            }
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. }

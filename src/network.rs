@@ -4,19 +4,20 @@ use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{stdin, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 
 use super::game::{Building, Game, ScoreEntry};
-use super::message::FromGuiMessage;
+use super::message::{FromGuiMessage, ToGuiMessage};
 
 pub struct EpochClient {
     address: String,
     name: String,
     token: Option<String>,
     game: Arc<Mutex<Game>>,
+    tx: Sender<ToGuiMessage>,
     rx: Receiver<FromGuiMessage>,
 }
 
@@ -102,6 +103,7 @@ impl EpochClient {
         address: &str,
         name: &str,
         token: Option<&str>,
+        tx: Sender<ToGuiMessage>,
         rx: Receiver<FromGuiMessage>,
         game: Arc<Mutex<Game>>,
     ) -> EpochClient {
@@ -110,6 +112,7 @@ impl EpochClient {
             name: name.to_string(),
             token: token.map(|x| x.to_string()),
             game,
+            tx,
             rx,
         }
     }
@@ -123,7 +126,11 @@ impl EpochClient {
         debug!("Network thread finished.");
     }
 
-    fn listen(mut reader: BufReader<TcpStream>, game: Arc<Mutex<Game>>) -> Result<(), Error> {
+    fn listen(
+        mut reader: BufReader<TcpStream>,
+        tx: Sender<ToGuiMessage>,
+        game: Arc<Mutex<Game>>,
+    ) -> Result<(), Error> {
         let mut line = String::new();
         loop {
             if reader.read_line(&mut line)? == 0 {
@@ -158,7 +165,8 @@ impl EpochClient {
                             info!("Debug message from server: \n{}", msg)
                         }
                         Answer::Error { message: msg } => {
-                            error!("Error message from server: \n{}", msg)
+                            error!("Error message from server: \n{}", msg);
+                            tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                         }
                         _ => warn!("Unimplemented answer type received."),
                     }
@@ -187,7 +195,8 @@ impl EpochClient {
         let reader = BufReader::new(stream.try_clone()?);
         let handle = {
             let game = self.game.clone();
-            thread::spawn(move || EpochClient::listen(reader, game))
+            let tx = self.tx.clone();
+            thread::spawn(move || EpochClient::listen(reader, tx, game))
         };
         let mut reader = BufReader::new(stdin());
         let mut line = String::new();
