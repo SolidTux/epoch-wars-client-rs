@@ -8,7 +8,7 @@ serde = "*"
 serde_json = "*"
 serde_derive = "*"
 failure = "*"
-sdl2 = { version = "*", features = ["image"] }
+sdl2 = { version = "*", features = ["image", "ttf"] }
 clap = "*"
 log = "*"
 stderrlog = "*"

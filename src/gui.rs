@@ -20,11 +20,12 @@ pub struct Gui {
     size: (u32, u32),
     context: Sdl,
     canvas: WindowCanvas,
-    textures: Textures,
+    assets: Assets,
 }
 
-struct Textures {
+struct Assets {
     buildings: HashMap<Building, Sprite>,
+    font: String,
     background: Sprite,
 }
 
@@ -34,8 +35,8 @@ struct Sprite {
     path: String,
 }
 
-impl Textures {
-    pub fn new() -> Textures {
+impl Assets {
+    pub fn new() -> Assets {
         let buildings: HashMap<Building, Sprite> = [
             (
                 Building::House,
@@ -61,8 +62,9 @@ impl Textures {
         ].iter()
             .cloned()
             .collect();
-        Textures {
+        Assets {
             buildings,
+            font: "res/font.ttf".to_string(),
             background: Sprite {
                 size: 1,
                 path: "res/bg.png".to_string(),
@@ -76,8 +78,9 @@ impl Gui {
         let context = sdl2::init().map_err(err_msg)?;
         let video = context.video().map_err(err_msg)?;
         let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).map_err(err_msg)?;
+        let ttf = sdl2::ttf::init().map_err(err_msg)?;
 
-        let textures = Textures::new();
+        let assets = Assets::new();
 
         let window = video
             .window("Epoch Wars", size.0, size.1)
@@ -95,7 +98,7 @@ impl Gui {
             size,
             context,
             canvas,
-            textures,
+            assets,
         })
     }
 
@@ -110,7 +113,7 @@ impl Gui {
     pub fn run_res(&mut self) -> Result<(), Error> {
         let texture_creator = self.canvas.texture_creator();
         let bg_texture = texture_creator
-            .load_texture(&self.textures.background.path)
+            .load_texture(&self.assets.background.path)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
         let mut counter = 0;
@@ -126,6 +129,7 @@ impl Gui {
                 }
             }
             thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+            self.canvas.set_draw_color(Color::RGB(50, 50, 50));
             self.canvas.clear();
             if let Ok(game) = self.game.lock() {
                 let (w, h) = self.size;
@@ -145,9 +149,9 @@ impl Gui {
                 }
                 for (pos, building) in &game.buildings {
                     let texture = texture_creator
-                        .load_texture(&self.textures.buildings[&building].path)
+                        .load_texture(&self.assets.buildings[&building].path)
                         .map_err(err_msg)?;
-                    let bs = &self.textures.buildings[&building].size;
+                    let bs = &self.assets.buildings[&building].size;
                     let r = Rect::new(
                         (x_min + s * (pos.0 - bs)) as i32,
                         (y_min + s * (pos.1 - bs)) as i32,

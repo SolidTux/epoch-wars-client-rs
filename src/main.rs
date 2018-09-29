@@ -47,6 +47,13 @@ fn main() {
                 .help("Increase verbosity. Can be specified multiple times."),
         )
         .arg(
+            Arg::with_name("token")
+                .short("t")
+                .long("token")
+                .takes_value(true)
+                .help("Rejoin token."),
+        )
+        .arg(
             Arg::with_name("address")
                 .required(true)
                 .takes_value(true)
@@ -71,7 +78,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let gui = matches.is_present("gui");
     let game = Arc::new(Mutex::new(Game::new()));
 
-    let client = EpochClient::new(&address, &name, game.clone());
+    let client = EpochClient::new(&address, &name, matches.value_of("token"), game.clone());
 
     let handle = thread::spawn(move || client.run());
 

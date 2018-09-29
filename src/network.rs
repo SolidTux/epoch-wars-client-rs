@@ -3,15 +3,17 @@ use serde_json;
 use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::{stdin, BufReader};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::Duration;
 
 use super::game::{Building, Game};
 
 pub struct EpochClient {
     address: String,
     name: String,
+    token: Option<String>,
     game: Arc<Mutex<Game>>,
 }
 
@@ -21,6 +23,9 @@ pub struct EpochClient {
 enum Command {
     Welcome {
         name: String,
+    },
+    Rejoin {
+        token: String,
     },
     Build {
         x: usize,
@@ -89,13 +94,26 @@ impl Command {
             None => Err(format_err!("No command specified.")),
         }
     }
+
+    pub fn send(&self, stream: &mut TcpStream) -> Result<(), Error> {
+        let s = serde_json::to_string(self)?;
+        trace!("Sending: {}", s);
+        writeln!(stream, "{}", s)?;
+        Ok(())
+    }
 }
 
 impl EpochClient {
-    pub fn new(address: &str, name: &str, game: Arc<Mutex<Game>>) -> EpochClient {
+    pub fn new(
+        address: &str,
+        name: &str,
+        token: Option<&str>,
+        game: Arc<Mutex<Game>>,
+    ) -> EpochClient {
         EpochClient {
             address: address.to_string(),
             name: name.to_string(),
+            token: token.map(|x| x.to_string()),
             game,
         }
     }
@@ -106,75 +124,90 @@ impl EpochClient {
                 error!("{}", e);
             }
         }
+        debug!("Network thread finished.");
+    }
+
+    fn listen(mut reader: BufReader<TcpStream>, game: Arc<Mutex<Game>>) -> Result<(), Error> {
+        let mut line = String::new();
+        loop {
+            if reader.read_line(&mut line)? == 0 {
+                return Err(format_err!("Connection lost."));
+            }
+            trace!("{}", line.trim());
+            match serde_json::from_str::<Answer>(&line.trim()) {
+                Ok(a) => {
+                    debug!("Answer: {:?}", a);
+                    match a {
+                        Answer::Welcome {
+                            player: p,
+                            map_size: s,
+                            rejoin: r,
+                        } => {
+                            if let Ok(mut g) = game.lock() {
+                                (*g).player = Some(p);
+                                (*g).size = s;
+                                (*g).rejoin = r.clone();
+                            }
+                        }
+                        Answer::EndOfTurn { scores: s, map: m } => {
+                            if let Ok(mut g) = game.lock() {
+                                (*g).scores = s;
+                                (*g).buildings.clear();
+                                for e in m {
+                                    (*g).buildings.insert(e.pos, e.building);
+                                }
+                            }
+                        }
+                        Answer::Debug { message: msg } => {
+                            info!("Debug message from server: \n{}", msg)
+                        }
+                        Answer::Error { message: msg } => {
+                            error!("Error message from server: \n{}", msg)
+                        }
+                        _ => warn!("Unimplemented answer type received."),
+                    }
+                }
+                Err(e) => {
+                    trace!("{:?}", e);
+                    warn!("{}", e)
+                }
+            }
+            line.clear()
+        }
+        Ok(())
     }
 
     fn run_res(&self) -> Result<(), Error> {
         debug!("Connecting to address: {}", self.address);
-        let mut stream = TcpStream::connect(&self.address)?;
-        let mut reader = BufReader::new(stream.try_clone()?);
+        let mut stream = TcpStream::connect_timeout(
+            &self
+                .address
+                .to_socket_addrs()?
+                .next()
+                .ok_or(format_err!("Error while parsing address."))?,
+            Duration::from_millis(2000),
+        )?;
+        stream.set_write_timeout(Some(Duration::from_millis(1000)))?;
+        debug!("Connected.");
+        let reader = BufReader::new(stream.try_clone()?);
         let handle = {
             let game = self.game.clone();
-            thread::spawn(move || {
-                let mut line = String::new();
-                while let Ok(len) = reader.read_line(&mut line) {
-                    if len == 0 {
-                        break;
-                    }
-                    trace!("{}", line.trim());
-                    match serde_json::from_str::<Answer>(&line.trim()) {
-                        Ok(a) => {
-                            debug!("Answer: {:?}", a);
-                            match a {
-                                Answer::Welcome {
-                                    player: p,
-                                    map_size: s,
-                                    rejoin: r,
-                                } => {
-                                    if let Ok(mut g) = game.lock() {
-                                        (*g).player = Some(p);
-                                        (*g).size = s;
-                                        (*g).rejoin = r.clone();
-                                    }
-                                }
-                                Answer::EndOfTurn { scores: s, map: m } => {
-                                    if let Ok(mut g) = game.lock() {
-                                        (*g).scores = s;
-                                        (*g).buildings.clear();
-                                        for e in m {
-                                            (*g).buildings.insert(e.pos, e.building);
-                                        }
-                                    }
-                                }
-                                Answer::Debug { message: msg } => {
-                                    info!("Debug message from server: \n{}", msg)
-                                }
-                                Answer::Error { message: msg } => {
-                                    error!("Error message from server: \n{}", msg)
-                                }
-                                _ => warn!("Unimplemented answer type received."),
-                            }
-                        }
-                        Err(e) => {
-                            trace!("{:?}", e);
-                            warn!("{}", e)
-                        }
-                    }
-                    line.clear()
-                }
-            })
+            thread::spawn(move || EpochClient::listen(reader, game))
         };
 
         let mut reader = BufReader::new(stdin());
         let mut line = String::new();
-        let s = serde_json::to_string(&Command::Welcome {
-            name: self.name.clone(),
-        })?;
-        writeln!(&mut stream, "{}", s)?;
+        if let Some(ref t) = self.token {
+            Command::Rejoin { token: t.clone() }.send(&mut stream)?;
+        } else {
+            Command::Welcome {
+                name: self.name.clone(),
+            }.send(&mut stream)?;
+        }
         while reader.read_line(&mut line).is_ok() {
             match Command::from_line(&line) {
                 Ok(cmd) => {
-                    let s = serde_json::to_string(&cmd)?;
-                    writeln!(&mut stream, "{}", s)?;
+                    cmd.send(&mut stream);
                 }
                 Err(err) => {
                     for e in err.iter_chain() {
