@@ -42,6 +42,13 @@ fn main() {
                 .help("Increase verbosity. Can be specified multiple times."),
         )
         .arg(
+            Arg::with_name("size")
+                .short("s")
+                .long("size")
+                .number_of_values(2)
+                .help("Window size."),
+        )
+        .arg(
             Arg::with_name("direct")
                 .short("d")
                 .long("direct")
@@ -84,6 +91,22 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let direct = matches.is_present("direct");
     let fullscreen = matches.is_present("fullscreen");
     let game = Arc::new(Mutex::new(Game::new()));
+    let size = {
+        if let Some(mut values) = matches.values_of("size") {
+            (
+                values
+                    .next()
+                    .ok_or(format_err!("Error with size input."))?
+                    .parse()?,
+                values
+                    .next()
+                    .ok_or(format_err!("Error with size input."))?
+                    .parse()?,
+            )
+        } else {
+            (800, 600)
+        }
+    };
 
     let (tx_gui, rx_net) = mpsc::channel();
     let (tx_net, rx_gui) = mpsc::channel();
@@ -97,7 +120,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     );
     let _handle = thread::spawn(move || client.run(direct));
 
-    let mut g = Gui::new((800, 600), fullscreen, tx_gui, rx_gui, game.clone())?;
+    let mut g = Gui::new(size, fullscreen, tx_gui, rx_gui, game.clone())?;
     g.run();
     Ok(())
 }
