@@ -178,7 +178,7 @@ impl Gui {
         let texture_creator = self.canvas.texture_creator();
         let font = self
             .ttf_context
-            .load_font(&self.assets.font, 60)
+            .load_font(&self.assets.font, 120)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
 
@@ -203,7 +203,7 @@ impl Gui {
             let y_min = (h - s * ny) / 2;
             let ew = (x_min * 2 / 9).min(s) as i32;
             let eg = (ew * 1 / 10) as i32;
-            let ag = (ew * 4 / 10) as i32;
+            let ag = (ew * 2 / 10) as i32;
             for i in 0..4 {
                 self.assets.active[i].rect = Some(Rect::new(
                     eg,
@@ -305,9 +305,9 @@ impl Gui {
                     for (i, sprite) in self.assets.active.iter().enumerate() {
                         if let Some(r) = sprite.rect {
                             if i == self.active {
-                                self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                                self.canvas.set_draw_color(Color::RGB(0, 200, 0));
                                 let r = r.clone();
-                                self.canvas.fill_rect(r).map_err(err_msg)?;
+                                self.canvas.draw_rect(r).map_err(err_msg)?;
                             } else if sprite.contains(mouse_pos) {
                                 self.canvas.set_draw_color(Color::RGB(255, 0, 0));
                                 let r = r.clone();
@@ -361,7 +361,8 @@ impl Gui {
                         h = h.max((r.h as f64).round() as i32);
                         strings.push(score_str);
                     }
-                    for (i, s) in strings.iter().enumerate() {
+                    let mut y = ag;
+                    for s in &strings {
                         if s.len() > 0 {
                             let surf = font
                                 .render(&s)
@@ -369,14 +370,27 @@ impl Gui {
                                 .map_err(err_msg)?;
                             let text = texture_creator.create_texture_from_surface(&surf).unwrap();
                             let mut r = surf.rect();
-                            r.x = eg;
-                            r.y += h * (i as i32);
+                            r.x = ag;
+                            r.y += y;
                             r.w = ((r.w as f64) * f).round() as i32;
                             r.h = ((r.h as f64) * f).round() as i32;
+                            y += r.h + ag;
                             self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
                         }
                     }
                 }
+            } else {
+                let surf = font
+                    .render("Waiting for server ...")
+                    .blended(Color::RGB(255, 255, 255))
+                    .map_err(err_msg)?;
+                let text = texture_creator.create_texture_from_surface(&surf).unwrap();
+                let mut r = surf.rect();
+                r.h = (r.h * w as i32 * 7) / (10 * r.w);
+                r.w = (w as i32 * 7) / 10;
+                r.x = (w as i32 - r.w) / 2;
+                r.y = (h as i32 - r.h) / 2;
+                self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
             }
             self.canvas.present();
             if let Ok(msg) = self.rx.try_recv() {

@@ -179,7 +179,7 @@ impl EpochClient {
                             pos: p,
                             building: b,
                         } => {
-                            error!("Error message from server: \n{}", msg);
+                            info!("Error message from server: \n{}", msg);
                             tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                             if let Some(subtype) = st {
                                 match subtype.to_lowercase().as_str() {
