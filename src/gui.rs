@@ -8,8 +8,9 @@ use sdl2::messagebox::{show_simple_message_box, MessageBoxFlag};
 use sdl2::mouse::MouseButton;
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
-use sdl2::render::WindowCanvas;
+use sdl2::render::{TextureCreator, WindowCanvas};
 use sdl2::ttf::Sdl2TtfContext;
+use sdl2::video::WindowContext;
 use sdl2::Sdl;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender};
@@ -38,13 +39,30 @@ struct Assets {
     font: String,
     background: Sprite,
     excavation: Sprite,
-    skip: Sprite,
+    active: Vec<Sprite>,
 }
 
 #[derive(Clone)]
 struct Sprite {
     size: u32,
     path: String,
+    pub rect: Option<Rect>,
+}
+
+impl Sprite {
+    pub fn contains(&self, pos: (i32, i32)) -> bool {
+        self.rect.map(|x| x.contains_point(pos)).unwrap_or(false)
+    }
+
+    pub fn draw(
+        &self,
+        texture_creator: &TextureCreator<WindowContext>,
+        canvas: &mut WindowCanvas,
+    ) -> Result<(), Error> {
+        let texture = texture_creator.load_texture(&self.path).map_err(err_msg)?;
+        canvas.copy(&texture, None, self.rect).map_err(err_msg)?;
+        Ok(())
+    }
 }
 
 impl Assets {
@@ -55,6 +73,7 @@ impl Assets {
                 Sprite {
                     size: 0,
                     path: "res/house.png".to_string(),
+                    rect: None,
                 },
             ),
             (
@@ -62,6 +81,7 @@ impl Assets {
                 Sprite {
                     size: 1,
                     path: "res/villa.png".to_string(),
+                    rect: None,
                 },
             ),
             (
@@ -69,6 +89,7 @@ impl Assets {
                 Sprite {
                     size: 0,
                     path: "res/tower.png".to_string(),
+                    rect: None,
                 },
             ),
         ].iter()
@@ -80,15 +101,35 @@ impl Assets {
             background: Sprite {
                 size: 1,
                 path: "res/bg.png".to_string(),
+                rect: None,
             },
             excavation: Sprite {
                 size: 1,
                 path: "res/ex.png".to_string(),
+                rect: None,
             },
-            skip: Sprite {
-                size: 1,
-                path: "res/skip.png".to_string(),
-            },
+            active: vec![
+                Sprite {
+                    size: 0,
+                    path: "res/house.png".to_string(),
+                    rect: None,
+                },
+                Sprite {
+                    size: 1,
+                    path: "res/villa.png".to_string(),
+                    rect: None,
+                },
+                Sprite {
+                    size: 0,
+                    path: "res/tower.png".to_string(),
+                    rect: None,
+                },
+                Sprite {
+                    size: 1,
+                    path: "res/skip.png".to_string(),
+                    rect: None,
+                },
+            ],
         }
     }
 }
@@ -149,21 +190,24 @@ impl Gui {
         let ex_texture = texture_creator
             .load_texture(&self.assets.excavation.path)
             .map_err(err_msg)?;
-        let sk_texture = texture_creator
-            .load_texture(&self.assets.skip.path)
-            .map_err(err_msg)?;
         let font = self
             .ttf_context
             .load_font(&self.assets.font, 60)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
-        let (w, h) = self.size;
-        let (mut nx, mut ny, mut s, mut x_min, mut y_min, ew, eg) = {
-            let game = self
-                .game
-                .lock()
-                .map_err(|_| format_err!("Error while locking Mutex."))?;
-            let (nx, ny) = game.size;
+
+        let mut excavation_position = None;
+        let mut temp_building = None;
+        let mut mouse_pos = (0, 0);
+        'running: loop {
+            let (w, h) = self.size;
+            let (nx, ny) = {
+                let game = self
+                    .game
+                    .lock()
+                    .map_err(|_| format_err!("Error while locking Mutex."))?;
+                game.size
+            };
             let x = (w as f64) / (nx as f64);
             let y = (h as f64) / (ny as f64);
             let s = x.min(y).round() as u32;
@@ -171,12 +215,15 @@ impl Gui {
             let y_min = (h - s * ny) / 2;
             let ew = (x_min * 2 / 9) as i32;
             let eg = (ew * 1 / 10) as i32;
-            (nx, ny, s, x_min, y_min, ew, eg)
-        };
+            for i in 0..4 {
+                self.assets.active[i].rect = Some(Rect::new(
+                    (i as i32) * ew + eg,
+                    (h as i32) - ew - eg,
+                    (ew - 2 * eg) as u32,
+                    (ew - 2 * eg) as u32,
+                ));
+            }
 
-        let mut excavation_position = None;
-        let mut temp_building = None;
-        'running: loop {
             for event in event_pump.poll_iter() {
                 match event {
                     Event::Quit { .. }
@@ -236,6 +283,7 @@ impl Gui {
                             self.tx.send(FromGuiMessage::Build((gx, gy), building))?;
                         }
                     }
+                    Event::MouseMotion { x, y, .. } => mouse_pos = (x, y),
                     _ => {}
                 }
             }
@@ -243,42 +291,21 @@ impl Gui {
             self.canvas.set_draw_color(Color::RGB(50, 50, 50));
             self.canvas.clear();
             if self.running {
-                for (i, building) in [Building::House, Building::Villa, Building::Tower]
-                    .iter()
-                    .enumerate()
-                {
-                    let texture = texture_creator
-                        .load_texture(&self.assets.buildings[&building].path)
-                        .map_err(err_msg)?;
-                    let r = Rect::new(
-                        (i as i32) * ew + eg,
-                        (h as i32) - ew - eg,
-                        (ew - 2 * eg) as u32,
-                        (ew - 2 * eg) as u32,
-                    );
-                    if i == self.active {
-                        self.canvas.set_draw_color(Color::RGB(255, 0, 0));
-                        self.canvas.fill_rect(r).map_err(err_msg)?;
+                for (i, sprite) in self.assets.active.iter().enumerate() {
+                    if let Some(r) = sprite.rect {
+                        if i == self.active {
+                            self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                            let r = r.clone();
+                            self.canvas.fill_rect(r).map_err(err_msg)?;
+                        } else if sprite.contains(mouse_pos) {
+                            self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                            let r = r.clone();
+                            self.canvas.draw_rect(r).map_err(err_msg)?;
+                        }
                     }
-                    self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
+                    sprite.draw(&texture_creator, &mut self.canvas)?;
                 }
-                let r = Rect::new(
-                    (3 as i32) * ew + eg,
-                    (h as i32) - ew - eg,
-                    (ew - 2 * eg) as u32,
-                    (ew - 2 * eg) as u32,
-                );
-                self.canvas
-                    .copy(&sk_texture, None, Some(r))
-                    .map_err(err_msg)?;
                 if let Ok(game) = self.game.lock() {
-                    nx = game.size.0;
-                    ny = game.size.1;
-                    let x = (w as f64) / (nx as f64);
-                    let y = (h as f64) / (ny as f64);
-                    s = x.min(y).round() as u32;
-                    x_min = w - s * nx;
-                    y_min = (h - s * ny) / 2;
                     for xt in 0..nx {
                         for yt in 0..ny {
                             let r =
