@@ -169,19 +169,13 @@ impl Gui {
             .load_font(&self.assets.font, 60)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
-        let mut timer = self.context.timer().map_err(err_msg)?;
 
         let mut excavation_sprite = None;
         let mut temp_sprite: Option<Sprite> = None;
         let mut mouse_pos = (0, 0);
         let mut building_sprites: Vec<Sprite> = Vec::new();
         let mut grid_sprites: Vec<Sprite> = Vec::new();
-        let mut message: Option<(String, String)> = None;
-        let mut message_start = 0;
         'running: loop {
-            if timer.ticks() - message_start > 2000 {
-                message = None;
-            }
             let (w, h) = self.canvas.window().drawable_size();
             let (nx, ny) = {
                 let game = self
@@ -285,7 +279,6 @@ impl Gui {
                     sprite.draw(&texture_creator, &mut self.canvas)?;
                     if let Some(r) = sprite.rect {
                         if sprite.contains(mouse_pos) {
-                            trace!("Mouse in {:?} {:?}\n{:?}", sprite.index, mouse_pos, r);
                             self.canvas.set_draw_color(Color::RGB(255, 0, 0));
                             let r = r.clone();
                             self.canvas.draw_rect(r).map_err(err_msg)?;
@@ -346,35 +339,17 @@ impl Gui {
                     }
                 }
             }
-            if let Some((title, msg)) = &message {
-                trace!("{}: {}", title, msg);
-                let surf = font
-                    .render(&title)
-                    .blended(Color::RGB(255, 255, 255))
-                    .map_err(err_msg)?;
-                let text = texture_creator.create_texture_from_surface(&surf).unwrap();
-                let mut r = surf.rect();
-                r.x = (w as i32 - r.w) / 2;
-                r.y = h as i32 / 5;
-                r.w = h as i32 / (20 * r.h);
-                r.h = h as i32 / 20;
-                self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
-                message_start = timer.ticks();
-            }
             self.canvas.present();
             if let Ok(msg) = self.rx.try_recv() {
                 trace!("Got message: {:?}", msg);
                 match msg {
                     ToGuiMessage::Start => self.running = true,
-                    ToGuiMessage::Message(t, s) => {
-                        message = Some((t.clone(), s.clone()));
-                        show_simple_message_box(
-                            MessageBoxFlag::empty(),
-                            &t,
-                            &s,
-                            self.canvas.window(),
-                        )?;
-                    }
+                    ToGuiMessage::Message(t, s) => show_simple_message_box(
+                        MessageBoxFlag::empty(),
+                        &t,
+                        &s,
+                        self.canvas.window(),
+                    )?,
                     ToGuiMessage::ExcavateResult(d, b, p) => match b {
                         Some(building) => show_simple_message_box(
                             MessageBoxFlag::empty(),
