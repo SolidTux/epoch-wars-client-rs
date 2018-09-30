@@ -56,7 +56,7 @@ impl Sprite {
             let mut exe = ::std::env::current_exe().unwrap();
             exe.pop();
             if cfg!(target_os = "macos") {
-                exe.to_str().unwrap().to_string() + "../res"
+                exe.to_str().unwrap().to_string() + "/../Resources/"
             } else if cfg!(debug_assertions) {
                 String::new()
             } else {
