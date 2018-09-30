@@ -127,6 +127,7 @@ impl EpochClient {
                                 (*g).size = s;
                                 (*g).rejoin = r.clone();
                             }
+                            tx.send(ToGuiMessage::UpdateGrid)?;
                             tx.send(ToGuiMessage::Start)?;
                         }
                         Answer::EndOfTurn {
@@ -135,6 +136,7 @@ impl EpochClient {
                             turn: t,
                             excavate_result: e,
                         } => {
+                            tx.send(ToGuiMessage::UpdateBuildings)?;
                             tx.send(ToGuiMessage::ClearBuilding)?;
                             tx.send(ToGuiMessage::ClearExcavate)?;
                             if let Ok(mut g) = game.lock() {
@@ -170,6 +172,7 @@ impl EpochClient {
                             building: b,
                         } => {
                             error!("Error message from server: \n{}", msg);
+                            tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                             if let Some(subtype) = st {
                                 match subtype.to_lowercase().as_str() {
                                     "invalidbuilderror" => tx.send(ToGuiMessage::ClearBuilding)?,
@@ -191,7 +194,6 @@ impl EpochClient {
                                     s => trace!("Got error subtype {}", s),
                                 }
                             }
-                            tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                         }
                     }
                 }

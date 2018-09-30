@@ -15,6 +15,8 @@ pub enum ToGuiMessage {
     ExcavateResult(i32, Option<Building>, (u32, u32)),
     ClearExcavate,
     ClearBuilding,
+    UpdateBuildings,
+    UpdateGrid,
     SetBuilding((u32, u32), Building),
     RequestQuit,
     Quit,

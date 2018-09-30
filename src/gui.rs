@@ -46,10 +46,22 @@ struct Assets {
 struct Sprite {
     size: u32,
     path: String,
-    pub rect: Option<Rect>,
+    building: Option<Building>,
+    index: Option<(u32, u32)>,
+    rect: Option<Rect>,
 }
 
 impl Sprite {
+    pub fn new(size: u32, path: &str) -> Sprite {
+        Sprite {
+            size,
+            path: path.to_string(),
+            building: None,
+            index: None,
+            rect: None,
+        }
+    }
+
     pub fn contains(&self, pos: (i32, i32)) -> bool {
         self.rect.map(|x| x.contains_point(pos)).unwrap_or(false)
     }
@@ -63,72 +75,39 @@ impl Sprite {
         canvas.copy(&texture, None, self.rect).map_err(err_msg)?;
         Ok(())
     }
+
+    pub fn draw_alpha(
+        &self,
+        texture_creator: &TextureCreator<WindowContext>,
+        canvas: &mut WindowCanvas,
+        alpha: u8,
+    ) -> Result<(), Error> {
+        let mut texture = texture_creator.load_texture(&self.path).map_err(err_msg)?;
+        texture.set_alpha_mod(alpha);
+        canvas.copy(&texture, None, self.rect).map_err(err_msg)?;
+        Ok(())
+    }
 }
 
 impl Assets {
     pub fn new() -> Assets {
         let buildings: HashMap<Building, Sprite> = [
-            (
-                Building::House,
-                Sprite {
-                    size: 0,
-                    path: "res/house.png".to_string(),
-                    rect: None,
-                },
-            ),
-            (
-                Building::Villa,
-                Sprite {
-                    size: 1,
-                    path: "res/villa.png".to_string(),
-                    rect: None,
-                },
-            ),
-            (
-                Building::Tower,
-                Sprite {
-                    size: 0,
-                    path: "res/tower.png".to_string(),
-                    rect: None,
-                },
-            ),
+            (Building::House, Sprite::new(0, "res/house.png")),
+            (Building::Villa, Sprite::new(1, "res/villa.png")),
+            (Building::Tower, Sprite::new(0, "res/tower.png")),
         ].iter()
             .cloned()
             .collect();
         Assets {
             buildings,
             font: "res/font.ttf".to_string(),
-            background: Sprite {
-                size: 1,
-                path: "res/bg.png".to_string(),
-                rect: None,
-            },
-            excavation: Sprite {
-                size: 1,
-                path: "res/ex.png".to_string(),
-                rect: None,
-            },
+            background: Sprite::new(0, "res/bg.png"),
+            excavation: Sprite::new(0, "res/ex.png"),
             active: vec![
-                Sprite {
-                    size: 0,
-                    path: "res/house.png".to_string(),
-                    rect: None,
-                },
-                Sprite {
-                    size: 1,
-                    path: "res/villa.png".to_string(),
-                    rect: None,
-                },
-                Sprite {
-                    size: 0,
-                    path: "res/tower.png".to_string(),
-                    rect: None,
-                },
-                Sprite {
-                    size: 1,
-                    path: "res/skip.png".to_string(),
-                    rect: None,
-                },
+                Sprite::new(0, "res/house.png"),
+                Sprite::new(1, "res/villa.png"),
+                Sprite::new(0, "res/tower.png"),
+                Sprite::new(0, "res/skip.png"),
             ],
         }
     }
@@ -147,7 +126,10 @@ impl Gui {
         let _image_context = sdl2::image::init(INIT_PNG | INIT_JPG).map_err(err_msg)?;
         let ttf_context = sdl2::ttf::init().map_err(err_msg)?;
 
-        let assets = Assets::new();
+        let mut assets = Assets::new();
+        assets.active[0].building = Some(Building::House);
+        assets.active[1].building = Some(Building::Villa);
+        assets.active[2].building = Some(Building::Tower);
 
         let mut window_builder = video.window("Epoch Wars", size.0, size.1);
         if fullscreen {
@@ -184,21 +166,17 @@ impl Gui {
 
     pub fn run_res(&mut self) -> Result<(), Error> {
         let texture_creator = self.canvas.texture_creator();
-        let bg_texture = texture_creator
-            .load_texture(&self.assets.background.path)
-            .map_err(err_msg)?;
-        let ex_texture = texture_creator
-            .load_texture(&self.assets.excavation.path)
-            .map_err(err_msg)?;
         let font = self
             .ttf_context
             .load_font(&self.assets.font, 60)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
 
-        let mut excavation_position = None;
-        let mut temp_building = None;
+        let mut excavation_sprite = None;
+        let mut temp_sprite: Option<Sprite> = None;
         let mut mouse_pos = (0, 0);
+        let mut building_sprites: Vec<Sprite> = Vec::new();
+        let mut grid_sprites: Vec<Sprite> = Vec::new();
         'running: loop {
             let (w, h) = self.size;
             let (nx, ny) = {
@@ -240,13 +218,16 @@ impl Gui {
                         y,
                         ..
                     } => {
-                        let gx = (x - (x_min as i32)) / (s as i32);
-                        let gy = (y - (y_min as i32)) / (s as i32);
-                        if (gx >= 0) && (gx < nx as i32) && (gy >= 0) && (gy < ny as i32) {
-                            let gx = gx as u32;
-                            let gy = gy as u32;
-                            self.tx.send(FromGuiMessage::Excavate((gx, gy)))?;
-                            excavation_position = Some((gx, gy));
+                        for sprite in &grid_sprites {
+                            if sprite.contains((x, y)) {
+                                if let Some(pos) = sprite.index {
+                                    let mut s = self.assets.excavation.clone();
+                                    s.index = Some(pos);
+                                    s.rect = sprite.rect.clone();
+                                    excavation_sprite = Some(s);
+                                    self.tx.send(FromGuiMessage::Excavate(pos))?;
+                                }
+                            }
                         }
                     }
                     Event::MouseButtonUp {
@@ -255,32 +236,37 @@ impl Gui {
                         y,
                         ..
                     } => {
-                        let gx = (x - (x_min as i32)) / (s as i32);
-                        let gy = (y - (y_min as i32)) / (s as i32);
-                        let building = match self.active {
-                            0 => Building::House,
-                            1 => Building::Villa,
-                            2 => Building::Tower,
-                            _ => Building::House,
-                        };
-                        let bs = self.assets.buildings[&building].size as i32;
-                        if (x < (x_min as i32)) && (y > ((h as i32) - ew)) {
-                            let a = (x / ew) as usize;
-                            if a < 3 {
-                                self.active = a;
-                                debug!("Element {} active.", self.active);
-                            } else {
-                                self.tx.send(FromGuiMessage::Skip)?;
+                        for (i, sprite) in self.assets.active.iter().enumerate() {
+                            if sprite.contains((x, y)) {
+                                if i < 3 {
+                                    self.active = i;
+                                } else if i == 3 {
+                                    self.tx.send(FromGuiMessage::Skip)?;
+                                }
                             }
-                        } else if (gx >= bs)
-                            && (gx < (nx as i32 - bs))
-                            && (gy >= bs)
-                            && (gy < (nx as i32 - bs))
-                        {
-                            let gx = gx as u32;
-                            let gy = gy as u32;
-                            temp_building = Some(((gx, gy), building.clone()));
-                            self.tx.send(FromGuiMessage::Build((gx, gy), building))?;
+                        }
+                        for sprite in &grid_sprites {
+                            if sprite.contains((x, y)) {
+                                if let Some(pos) = sprite.index {
+                                    let asprite = self.assets.active[self.active].clone();
+                                    if let Some(building) = asprite.building {
+                                        let bs = asprite.size;
+                                        temp_sprite = Some(Sprite {
+                                            size: bs,
+                                            index: Some(pos),
+                                            path: self.assets.buildings[&building].path.clone(),
+                                            building: Some(building.clone()),
+                                            rect: Some(Rect::new(
+                                                (x_min + s * (pos.0 - bs)) as i32,
+                                                (y_min + s * (pos.1 - bs)) as i32,
+                                                s * (1 + 2 * bs),
+                                                s * (1 + 2 * bs),
+                                            )),
+                                        });
+                                        self.tx.send(FromGuiMessage::Build(pos, building.clone()))?;
+                                    }
+                                }
+                            }
                         }
                     }
                     Event::MouseMotion { x, y, .. } => mouse_pos = (x, y),
@@ -291,6 +277,19 @@ impl Gui {
             self.canvas.set_draw_color(Color::RGB(50, 50, 50));
             self.canvas.clear();
             if self.running {
+                for sprite in &grid_sprites {
+                    sprite.draw(&texture_creator, &mut self.canvas)?;
+                    if let Some(r) = sprite.rect {
+                        if sprite.contains(mouse_pos) {
+                            self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                            let r = r.clone();
+                            self.canvas.draw_rect(r).map_err(err_msg)?;
+                        }
+                    }
+                }
+                if let Some(sprite) = &excavation_sprite {
+                    sprite.draw(&texture_creator, &mut self.canvas)?;
+                }
                 for (i, sprite) in self.assets.active.iter().enumerate() {
                     if let Some(r) = sprite.rect {
                         if i == self.active {
@@ -305,55 +304,16 @@ impl Gui {
                     }
                     sprite.draw(&texture_creator, &mut self.canvas)?;
                 }
+                if let Some(sprite) = &temp_sprite {
+                    sprite.draw_alpha(&texture_creator, &mut self.canvas, 100)?;
+                }
                 if let Ok(game) = self.game.lock() {
-                    for xt in 0..nx {
-                        for yt in 0..ny {
-                            let r =
-                                Rect::new((x_min + s * xt) as i32, (y_min + s * yt) as i32, s, s);
-                            if excavation_position
-                                .map(|(x, y)| (x == xt) && (y == yt))
-                                .unwrap_or(false)
-                            {
-                                self.canvas
-                                    .copy(&ex_texture, None, Some(r))
-                                    .map_err(err_msg)?;
-                            } else {
-                                self.canvas
-                                    .copy(&bg_texture, None, Some(r))
-                                    .map_err(err_msg)?;
-                            }
-                        }
-                    }
-                    for (pos, building) in &game.buildings {
-                        let texture = texture_creator
-                            .load_texture(&self.assets.buildings[&building].path)
-                            .map_err(err_msg)?;
-                        let bs = &self.assets.buildings[&building].size;
-                        let r = Rect::new(
-                            (x_min + s * (pos.0 - bs)) as i32,
-                            (y_min + s * (pos.1 - bs)) as i32,
-                            s * (1 + 2 * bs),
-                            s * (1 + 2 * bs),
-                        );
-                        self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
-                    }
-                    if let Some((pos, building)) = &temp_building {
-                        let mut texture = texture_creator
-                            .load_texture(&self.assets.buildings[&building].path)
-                            .map_err(err_msg)?;
-                        texture.set_alpha_mod(127);
-                        let bs = &self.assets.buildings[&building].size;
-                        let r = Rect::new(
-                            (x_min + s * (pos.0 - bs)) as i32,
-                            (y_min + s * (pos.1 - bs)) as i32,
-                            s * (1 + 2 * bs),
-                            s * (1 + 2 * bs),
-                        );
-                        self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
-                    }
                     let mut strings = vec![format!("Turn {}", game.turn)];
                     let mut f = ::std::f64::INFINITY;
                     let mut h = 0;
+                    for sprite in &building_sprites {
+                        sprite.draw(&texture_creator, &mut self.canvas)?;
+                    }
                     for score in &game.scores {
                         let s = format!("{:3}: {}", score.score, score.name);
                         let surf = font
@@ -411,14 +371,66 @@ impl Gui {
                             self.canvas.window(),
                         )?,
                     },
-                    ToGuiMessage::ClearBuilding => temp_building = None,
+                    ToGuiMessage::ClearBuilding => temp_sprite = None,
                     ToGuiMessage::SetBuilding(pos, building) => {
-                        temp_building = Some((pos, building.clone()))
+                        let bs = self.assets.buildings[&building].size;
+                        temp_sprite = Some(Sprite {
+                            size: bs,
+                            index: Some(pos),
+                            path: self.assets.buildings[&building].path.clone(),
+                            building: Some(building.clone()),
+                            rect: Some(Rect::new(
+                                (x_min + s * (pos.0 - bs)) as i32,
+                                (y_min + s * (pos.1 - bs)) as i32,
+                                s * (1 + 2 * bs),
+                                s * (1 + 2 * bs),
+                            )),
+                        })
                     }
-                    ToGuiMessage::ClearExcavate => excavation_position = None,
+                    ToGuiMessage::ClearExcavate => excavation_sprite = None,
                     ToGuiMessage::RequestQuit => {
                         self.tx.send(FromGuiMessage::Quit)?;
                         break 'running;
+                    }
+                    ToGuiMessage::UpdateGrid => {
+                        grid_sprites.clear();
+                        for x in 0..nx {
+                            for y in 0..ny {
+                                let mut sprite = self.assets.background.clone();
+                                sprite.index = Some((x, y));
+                                sprite.rect = Some(Rect::new(
+                                    (x_min + s * x) as i32,
+                                    (y_min + s * y) as i32,
+                                    s,
+                                    s,
+                                ));
+                                grid_sprites.push(sprite);
+                            }
+                        }
+                    }
+                    ToGuiMessage::UpdateBuildings => {
+                        if let Ok(game) = self.game.lock() {
+                            building_sprites = (&game)
+                                .buildings
+                                .iter()
+                                .map(|(pos, building)| {
+                                    let bs = self.assets.buildings[&building].size;
+                                    Sprite {
+                                        size: bs,
+                                        index: Some(*pos),
+                                        path: self.assets.buildings[&building].path.clone(),
+                                        building: Some(building.clone()),
+                                        rect: Some(Rect::new(
+                                            (x_min + s * (pos.0 - bs)) as i32,
+                                            (y_min + s * (pos.1 - bs)) as i32,
+                                            s * (1 + 2 * bs),
+                                            s * (1 + 2 * bs),
+                                        )),
+                                    }
+                                })
+                                .collect::<Vec<_>>()
+                                .clone();
+                        }
                     }
                     ToGuiMessage::Quit => break 'running,
                 }
