@@ -271,7 +271,10 @@ impl Gui {
                             }
                         }
                     }
-                    Event::MouseMotion { x, y, .. } => mouse_pos = (x, y),
+                    Event::MouseMotion { x, y, .. } => mouse_pos = {
+                        trace!("Mouse: {} {}", x, y);
+                        (x, y)
+                    }
                     _ => {}
                 }
             }
