@@ -52,9 +52,21 @@ struct Sprite {
 
 impl Sprite {
     pub fn new(size: u32, path: &str) -> Sprite {
+        let base_res_path = {
+            let mut exe = ::std::env::current_exe().unwrap();
+            exe.pop();
+            if cfg!(target_os = "macos") {
+                exe.to_str().unwrap().to_string() + "../res"
+            } else if cfg!(debug_assertions) {
+                String::new()
+            } else {
+                exe.to_str().unwrap().to_string()
+            }
+        };
+        debug!("Base resource path: {}", base_res_path);
         Sprite {
             size,
-            path: path.to_string(),
+            path: base_res_path + path,
             building: None,
             index: None,
             rect: None,
