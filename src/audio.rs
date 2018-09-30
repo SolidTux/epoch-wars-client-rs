@@ -1,5 +1,5 @@
 use failure::Error;
-use rodio::{default_output_device, Decoder, Device, Sink, Source};
+use rodio::{default_output_device, Decoder, Sink, Source};
 use std::fs::File;
 use std::io::BufReader;
 use std::sync::mpsc::Receiver;

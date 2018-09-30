@@ -89,7 +89,9 @@ fn main() {
 }
 
 fn main_res(matches: ArgMatches) -> Result<(), Error> {
-    let address = matches.value_of("address").unwrap_or("localhost:4200");
+    let address = matches
+        .value_of("address")
+        .unwrap_or("epoch-wars-session.blahut.tech:4200");
     let name = matches.value_of("name").unwrap_or("Noname");
     let direct = matches.is_present("direct");
     let fullscreen = matches.is_present("fullscreen");
