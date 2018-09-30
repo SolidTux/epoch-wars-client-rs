@@ -19,7 +19,7 @@ use std::thread;
 use std::time::Duration;
 
 use super::game::{Building, Game};
-use super::message::{FromGuiMessage, ToGuiMessage};
+use super::message::{AudioMessage, FromGuiMessage, ToGuiMessage};
 
 pub struct Gui {
     game: Arc<Mutex<Game>>,
@@ -30,6 +30,7 @@ pub struct Gui {
     active: usize,
     tx: Sender<FromGuiMessage>,
     rx: Receiver<ToGuiMessage>,
+    tx_audio: Sender<AudioMessage>,
     running: bool,
 }
 
@@ -130,6 +131,7 @@ impl Gui {
         fullscreen: bool,
         tx: Sender<FromGuiMessage>,
         rx: Receiver<ToGuiMessage>,
+        tx_audio: Sender<AudioMessage>,
         game: Arc<Mutex<Game>>,
     ) -> Result<Gui, Error> {
         let context = sdl2::init().map_err(err_msg)?;
@@ -161,6 +163,7 @@ impl Gui {
             canvas,
             assets,
             tx,
+            tx_audio,
             rx,
             running: false,
         })
@@ -275,6 +278,7 @@ impl Gui {
                                             )),
                                         });
                                         self.tx.send(FromGuiMessage::Build(pos, building.clone()))?;
+                                        self.tx_audio.send(AudioMessage::Build)?;
                                     }
                                 }
                             }

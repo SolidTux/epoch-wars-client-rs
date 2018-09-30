@@ -21,3 +21,7 @@ pub enum ToGuiMessage {
     RequestQuit,
     Quit,
 }
+
+pub enum AudioMessage {
+    Build,
+}

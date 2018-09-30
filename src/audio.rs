@@ -2,14 +2,19 @@ use failure::Error;
 use rodio::{default_output_device, Decoder, Device, Sink, Source};
 use std::fs::File;
 use std::io::BufReader;
+use std::sync::mpsc::Receiver;
 use std::thread;
+
+use super::message::AudioMessage;
 
 pub struct Audio {
     bg_music: String,
+    build: String,
+    rx: Receiver<AudioMessage>,
 }
 
 impl Audio {
-    pub fn new() -> Result<Audio, Error> {
+    pub fn new(rx: Receiver<AudioMessage>) -> Result<Audio, Error> {
         let base_res_path = {
             let mut exe = ::std::env::current_exe().unwrap();
             exe.pop();
@@ -22,7 +27,9 @@ impl Audio {
             }
         };
         Ok(Audio {
-            bg_music: base_res_path + "res/bg.mp3",
+            bg_music: base_res_path.clone() + "res/bg.mp3",
+            build: base_res_path + "res/build.ogg",
+            rx,
         })
     }
 
@@ -47,6 +54,25 @@ impl Audio {
             sink.append(source.buffered().repeat_infinite());
             sink.sleep_until_end();
         });
+
+        while let Ok(msg) = self.rx.recv() {
+            match msg {
+                AudioMessage::Build => {
+                    let build = self.build.clone();
+                    thread::spawn(move || {
+                        let device = default_output_device()
+                            .ok_or(format_err!("Unable to open audio device."))
+                            .unwrap();
+                        let sink = Sink::new(&device);
+                        debug!("Playing {}", build);
+                        let file = File::open(&build).unwrap();
+                        let source = Decoder::new(BufReader::new(file)).unwrap();
+                        sink.append(source.buffered());
+                        sink.sleep_until_end();
+                    });
+                }
+            }
+        }
         Ok(())
     }
 }

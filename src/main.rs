@@ -113,6 +113,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
 
     let (tx_gui, rx_net) = mpsc::channel();
     let (tx_net, rx_gui) = mpsc::channel();
+    let (tx_audio, rx_audio) = mpsc::channel();
     let client = EpochClient::new(
         &address,
         &name,
@@ -122,10 +123,10 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
         game.clone(),
     );
     let _handle = thread::spawn(move || client.run(direct));
-    let audio = Audio::new()?;
+    let audio = Audio::new(rx_audio)?;
     let _audio_handle = thread::spawn(move || audio.run());
 
-    let mut g = Gui::new(size, fullscreen, tx_gui, rx_gui, game.clone())?;
+    let mut g = Gui::new(size, fullscreen, tx_gui, rx_gui, tx_audio, game.clone())?;
     g.run();
     Ok(())
 }
