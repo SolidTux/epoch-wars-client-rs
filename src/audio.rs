@@ -27,7 +27,7 @@ impl Audio {
             }
         };
         Ok(Audio {
-            bg_music: base_res_path.clone() + "res/bg.mp3",
+            bg_music: base_res_path.clone() + "res/bg.ogg",
             build: base_res_path + "res/build.ogg",
             rx,
         })

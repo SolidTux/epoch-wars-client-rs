@@ -2,6 +2,7 @@
 name = "epoch-wars-client-rs"
 version = "0.1.0"
 authors = ["Daniel Hauck <mail@dhauck.eu>"]
+build = "build.rs"
 
 [dependencies]
 serde = "*"
@@ -9,7 +10,7 @@ serde_json = "*"
 serde_derive = "*"
 failure = "*"
 sdl2 = { version = "*", features = ["image", "ttf"] }
-rodio = "*"
+rodio = { version = "*", default_features = false, features = ["vorbis"] }
 clap = "*"
 log = "*"
 stderrlog = "*"
