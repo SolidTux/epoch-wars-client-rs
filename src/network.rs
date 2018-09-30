@@ -260,6 +260,7 @@ impl EpochClient {
                 FromGuiMessage::Excavate(pos) => {
                     Command::Excavate { x: pos.0, y: pos.1 }.send(&mut stream)?
                 }
+                FromGuiMessage::Skip => Command::EndTurn.send(&mut stream)?,
                 FromGuiMessage::Quit => break,
             }
         }

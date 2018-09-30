@@ -38,6 +38,7 @@ struct Assets {
     font: String,
     background: Sprite,
     excavation: Sprite,
+    skip: Sprite,
 }
 
 #[derive(Clone)]
@@ -83,6 +84,10 @@ impl Assets {
             excavation: Sprite {
                 size: 1,
                 path: "res/ex.png".to_string(),
+            },
+            skip: Sprite {
+                size: 1,
+                path: "res/skip.png".to_string(),
             },
         }
     }
@@ -143,6 +148,9 @@ impl Gui {
             .map_err(err_msg)?;
         let ex_texture = texture_creator
             .load_texture(&self.assets.excavation.path)
+            .map_err(err_msg)?;
+        let sk_texture = texture_creator
+            .load_texture(&self.assets.skip.path)
             .map_err(err_msg)?;
         let font = self
             .ttf_context
@@ -210,8 +218,13 @@ impl Gui {
                         };
                         let bs = self.assets.buildings[&building].size as i32;
                         if (x < (x_min as i32)) && (y > ((h as i32) - ew)) {
-                            self.active = ((x / ew) as usize).min(2);
-                            debug!("Element {} active.", self.active);
+                            let a = (x / ew) as usize;
+                            if a < 3 {
+                                self.active = a;
+                                debug!("Element {} active.", self.active);
+                            } else {
+                                self.tx.send(FromGuiMessage::Skip)?;
+                            }
                         } else if (gx >= bs)
                             && (gx < (nx as i32 - bs))
                             && (gy >= bs)
@@ -249,6 +262,15 @@ impl Gui {
                     }
                     self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
                 }
+                let r = Rect::new(
+                    (3 as i32) * ew + eg,
+                    (h as i32) - ew - eg,
+                    (ew - 2 * eg) as u32,
+                    (ew - 2 * eg) as u32,
+                );
+                self.canvas
+                    .copy(&sk_texture, None, Some(r))
+                    .map_err(err_msg)?;
                 if let Ok(game) = self.game.lock() {
                     nx = game.size.0;
                     ny = game.size.1;

@@ -4,6 +4,7 @@ use super::game::Building;
 pub enum FromGuiMessage {
     Build((u32, u32), Building),
     Excavate((u32, u32)),
+    Skip,
     Quit,
 }
 
