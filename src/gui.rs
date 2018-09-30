@@ -189,7 +189,7 @@ impl Gui {
             let s = x.min(y).floor() as u32;
             let x_min = w - s * nx;
             let y_min = (h - s * ny) / 2;
-            let ew = (x_min * 2 / 9) as i32;
+            let ew = (x_min * 2 / 9).min(s) as i32;
             let eg = (ew * 1 / 10) as i32;
             let ag = (ew * 4 / 10) as i32;
             for i in 0..4 {
@@ -338,15 +338,16 @@ impl Gui {
                         sprite.draw(&texture_creator, &mut self.canvas)?;
                     }
                     for score in &game.scores {
-                        let s = format!("{:3}: {}", score.score, score.name);
+                        let score_str = format!("{:3}: {}", score.score, score.name);
                         let surf = font
-                            .render(&s)
+                            .render(&score_str)
                             .blended(Color::RGB(255, 255, 255))
                             .map_err(err_msg)?;
                         let mut r = surf.rect();
                         f = f.min((x_min as f64 - ag as f64) / (r.w as f64));
+                        f = f.min((s as f64) / (r.h as f64));
                         h = h.max((r.h as f64).round() as i32);
-                        strings.push(s);
+                        strings.push(score_str);
                     }
                     for (i, s) in strings.iter().enumerate() {
                         if s.len() > 0 {
