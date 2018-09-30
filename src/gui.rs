@@ -191,10 +191,11 @@ impl Gui {
             let y_min = (h - s * ny) / 2;
             let ew = (x_min * 2 / 9) as i32;
             let eg = (ew * 1 / 10) as i32;
+            let ag = (ew * 4 / 10) as i32;
             for i in 0..4 {
                 self.assets.active[i].rect = Some(Rect::new(
-                    (i as i32) * ew + eg,
-                    (h as i32) - ew - eg,
+                    eg,
+                    (h as i32) + (i as i32) * ew - eg - 4 * ew,
                     (ew - 2 * eg) as u32,
                     (ew - 2 * eg) as u32,
                 ));
@@ -288,24 +289,48 @@ impl Gui {
                 if let Some(sprite) = &excavation_sprite {
                     sprite.draw(&texture_creator, &mut self.canvas)?;
                 }
-                for (i, sprite) in self.assets.active.iter().enumerate() {
-                    if let Some(r) = sprite.rect {
-                        if i == self.active {
-                            self.canvas.set_draw_color(Color::RGB(255, 0, 0));
-                            let r = r.clone();
-                            self.canvas.fill_rect(r).map_err(err_msg)?;
-                        } else if sprite.contains(mouse_pos) {
-                            self.canvas.set_draw_color(Color::RGB(255, 0, 0));
-                            let r = r.clone();
-                            self.canvas.draw_rect(r).map_err(err_msg)?;
-                        }
-                    }
-                    sprite.draw(&texture_creator, &mut self.canvas)?;
-                }
-                if let Some(sprite) = &temp_sprite {
-                    sprite.draw_alpha(&texture_creator, &mut self.canvas, 100)?;
-                }
                 if let Ok(game) = self.game.lock() {
+                    for (i, sprite) in self.assets.active.iter().enumerate() {
+                        if let Some(r) = sprite.rect {
+                            if i == self.active {
+                                self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                                let r = r.clone();
+                                self.canvas.fill_rect(r).map_err(err_msg)?;
+                            } else if sprite.contains(mouse_pos) {
+                                self.canvas.set_draw_color(Color::RGB(255, 0, 0));
+                                let r = r.clone();
+                                self.canvas.draw_rect(r).map_err(err_msg)?;
+                            }
+                            if i < 3 {
+                                if let Some(building) = &sprite.building {
+                                    if let Some(price) = game.prices.get(building) {
+                                        let s = if i == 2 {
+                                            format!("{} ({})", price, game.tower_count)
+                                        } else {
+                                            format!("{}", price)
+                                        };
+                                        let surf = font
+                                            .render(&s)
+                                            .blended(Color::RGB(255, 255, 255))
+                                            .map_err(err_msg)?;
+                                        let text = texture_creator
+                                            .create_texture_from_surface(&surf)
+                                            .unwrap();
+                                        let mut rt = surf.rect().clone();
+                                        rt.x = ew + 3 * eg;
+                                        rt.y = r.y;
+                                        rt.w = (rt.w * (ew - 2 * eg)) / rt.h;
+                                        rt.h = ew - 2 * eg;
+                                        self.canvas.copy(&text, None, Some(rt)).map_err(err_msg)?;
+                                    }
+                                }
+                            }
+                        }
+                        sprite.draw(&texture_creator, &mut self.canvas)?
+                    }
+                    if let Some(sprite) = &temp_sprite {
+                        sprite.draw_alpha(&texture_creator, &mut self.canvas, 100)?;
+                    }
                     let mut strings = vec![format!("Turn {}", game.turn)];
                     let mut f = ::std::f64::INFINITY;
                     let mut h = 0;
@@ -319,7 +344,7 @@ impl Gui {
                             .blended(Color::RGB(255, 255, 255))
                             .map_err(err_msg)?;
                         let mut r = surf.rect();
-                        f = f.min((x_min as f64) / (r.w as f64));
+                        f = f.min((x_min as f64 - ag as f64) / (r.w as f64));
                         h = h.max((r.h as f64).round() as i32);
                         strings.push(s);
                     }
@@ -331,6 +356,7 @@ impl Gui {
                                 .map_err(err_msg)?;
                             let text = texture_creator.create_texture_from_surface(&surf).unwrap();
                             let mut r = surf.rect();
+                            r.x = eg;
                             r.y += h * (i as i32);
                             r.w = ((r.w as f64) * f).round() as i32;
                             r.h = ((r.h as f64) * f).round() as i32;
