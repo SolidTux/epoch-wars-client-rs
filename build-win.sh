@@ -17,9 +17,11 @@ popd
 cargo build --release --target=x86_64-pc-windows-gnu
 
 mkdir -p "target/$NAME-$VERSION/SDL"
-cp "target/x86_64-pc-windows-gnu/release/$NAME" "target/$NAME-$VERSION"
+cp "target/x86_64-pc-windows-gnu/release/$NAME.exe" "target/$NAME-$VERSION"
 find target/sdl -iname '*.dll' -exec cp '{}' "target/$NAME-$VERSION" \;
 find target/sdl -iname '*.txt' -exec cp '{}' "target/$NAME-$VERSION/SDL" \;
+cp -vR res "target/$NAME-$VERSION/res"
 cp LICENSE "target/$NAME-$VERSION"
 
-zip -r "target/$NAME-$VERSION.zip" "target/$NAME-$VERSION"
+pushd target
+zip -r "$NAME-$VERSION.zip" "$NAME-$VERSION"

@@ -61,7 +61,7 @@ impl Sprite {
             } else if cfg!(debug_assertions) {
                 String::new()
             } else {
-                exe.to_str().unwrap().to_string()
+                exe.to_str().unwrap().to_string() + "/"
             }
         };
         debug!("Base resource path: {}", base_res_path);

@@ -23,7 +23,7 @@ impl Audio {
             } else if cfg!(debug_assertions) {
                 String::new()
             } else {
-                exe.to_str().unwrap().to_string()
+                exe.to_str().unwrap().to_string() + "/"
             }
         };
         Ok(Audio {
