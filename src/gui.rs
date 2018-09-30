@@ -23,7 +23,6 @@ use super::message::{FromGuiMessage, ToGuiMessage};
 
 pub struct Gui {
     game: Arc<Mutex<Game>>,
-    size: (u32, u32),
     context: Sdl,
     ttf_context: Sdl2TtfContext,
     canvas: WindowCanvas,
@@ -132,8 +131,9 @@ impl Gui {
         assets.active[2].building = Some(Building::Tower);
 
         let mut window_builder = video.window("Epoch Wars", size.0, size.1);
+        window_builder.allow_highdpi();
         if fullscreen {
-            window_builder.fullscreen();
+            window_builder.fullscreen_desktop();
         }
         let window = window_builder.position_centered().build()?;
 
@@ -145,7 +145,6 @@ impl Gui {
         Ok(Gui {
             game,
             active: 0,
-            size,
             context,
             ttf_context,
             canvas,
@@ -171,14 +170,17 @@ impl Gui {
             .load_font(&self.assets.font, 60)
             .map_err(err_msg)?;
         let mut event_pump = self.context.event_pump().unwrap();
+        let mut timer = self.context.timer().map_err(err_msg)?;
 
         let mut excavation_sprite = None;
         let mut temp_sprite: Option<Sprite> = None;
         let mut mouse_pos = (0, 0);
         let mut building_sprites: Vec<Sprite> = Vec::new();
         let mut grid_sprites: Vec<Sprite> = Vec::new();
+        let mut message: Option<(String, String)> = None;
+        let mut message_start = 0;
         'running: loop {
-            let (w, h) = self.size;
+            let (w, h) = self.canvas.window().drawable_size();
             let (nx, ny) = {
                 let game = self
                     .game
@@ -341,12 +343,27 @@ impl Gui {
                     }
                 }
             }
+            if let Some((title, msg)) = &message {
+                let surf = font
+                    .render(&title)
+                    .blended(Color::RGB(255, 255, 255))
+                    .map_err(err_msg)?;
+                let text = texture_creator.create_texture_from_surface(&surf).unwrap();
+                let mut r = surf.rect();
+                r.x = (w as i32 - r.w) / 2;
+                r.y = h as i32 / 5;
+                r.w = h as i32 / (20 * r.h);
+                r.h = h as i32 / 20;
+                //self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
+                message_start = timer.ticks();
+            }
             self.canvas.present();
             if let Ok(msg) = self.rx.try_recv() {
-                debug!("Got message: {:?}", msg);
+                trace!("Got message: {:?}", msg);
                 match msg {
                     ToGuiMessage::Start => self.running = true,
                     ToGuiMessage::Message(t, s) => {
+                        message = Some((t.clone(), s.clone()));
                         show_simple_message_box(
                             MessageBoxFlag::empty(),
                             &t,

@@ -44,7 +44,14 @@ fn main() {
         .arg(
             Arg::with_name("direct")
                 .short("d")
+                .long("direct")
                 .help("Use direct connection to server instead of session server."),
+        )
+        .arg(
+            Arg::with_name("fullscreen")
+                .short("f")
+                .long("full")
+                .help("Show window in fullscreen."),
         )
         .arg(
             Arg::with_name("token")
@@ -75,6 +82,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     let address = matches.value_of("address").unwrap_or("localhost:4200");
     let name = matches.value_of("name").unwrap_or("Noname");
     let direct = matches.is_present("direct");
+    let fullscreen = matches.is_present("fullscreen");
     let game = Arc::new(Mutex::new(Game::new()));
 
     let (tx_gui, rx_net) = mpsc::channel();
@@ -89,7 +97,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     );
     let _handle = thread::spawn(move || client.run(direct));
 
-    let mut g = Gui::new((1024, 768), false, tx_gui, rx_gui, game.clone())?;
+    let mut g = Gui::new((800, 600), fullscreen, tx_gui, rx_gui, game.clone())?;
     g.run();
     Ok(())
 }
