@@ -324,7 +324,7 @@ impl Gui {
                         );
                         self.canvas.copy(&texture, None, Some(r)).map_err(err_msg)?;
                     }
-                    let mut strings = Vec::new();
+                    let mut strings = vec![format!("Turn {}", game.turn)];
                     let mut f = ::std::f64::INFINITY;
                     let mut h = 0;
                     for score in &game.scores {
@@ -356,6 +356,7 @@ impl Gui {
             }
             self.canvas.present();
             if let Ok(msg) = self.rx.try_recv() {
+                debug!("Got message: {:?}", msg);
                 match msg {
                     ToGuiMessage::Start => self.running = true,
                     ToGuiMessage::Message(t, s) => {
@@ -388,6 +389,10 @@ impl Gui {
                         temp_building = Some((pos, building.clone()))
                     }
                     ToGuiMessage::ClearExcavate => excavation_position = None,
+                    ToGuiMessage::RequestQuit => {
+                        self.tx.send(FromGuiMessage::Quit)?;
+                        break 'running;
+                    }
                     ToGuiMessage::Quit => break 'running,
                 }
             }

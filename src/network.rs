@@ -43,6 +43,7 @@ enum Answer {
     EndOfTurn {
         scores: Vec<ScoreEntry>,
         map: Vec<MapAnswer>,
+        turn: u32,
         excavate_result: Option<ExcavateAnswer>,
     },
     Error {
@@ -50,6 +51,10 @@ enum Answer {
         subtype: Option<String>,
         pos: Option<(u32, u32)>,
         building: Option<Building>,
+    },
+    GameOver {
+        message: String,
+        score: i32,
     },
     Debug {
         message: String,
@@ -127,6 +132,7 @@ impl EpochClient {
                         Answer::EndOfTurn {
                             scores: s,
                             map: m,
+                            turn: t,
                             excavate_result: e,
                         } => {
                             tx.send(ToGuiMessage::ClearBuilding)?;
@@ -134,6 +140,7 @@ impl EpochClient {
                             if let Ok(mut g) = game.lock() {
                                 (*g).scores = s;
                                 (*g).buildings.clear();
+                                (*g).turn = t;
                                 for e in m {
                                     (*g).buildings.insert(e.pos, e.building);
                                 }
@@ -145,6 +152,13 @@ impl EpochClient {
                                     ))?;
                                 }
                             }
+                        }
+                        Answer::GameOver { message, score } => {
+                            tx.send(ToGuiMessage::Message(
+                                "Finish".to_string(),
+                                format!("{}\nScore: {}", message, score),
+                            ))?;
+                            tx.send(ToGuiMessage::RequestQuit)?;
                         }
                         Answer::Debug { message: msg } => {
                             info!("Debug message from server: \n{}", msg)

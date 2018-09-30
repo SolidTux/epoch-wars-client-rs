@@ -16,5 +16,6 @@ pub enum ToGuiMessage {
     ClearExcavate,
     ClearBuilding,
     SetBuilding((u32, u32), Building),
+    RequestQuit,
     Quit,
 }
