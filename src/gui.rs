@@ -180,6 +180,9 @@ impl Gui {
         let mut message: Option<(String, String)> = None;
         let mut message_start = 0;
         'running: loop {
+            if timer.ticks() - message_start > 2000 {
+                message = None;
+            }
             let (w, h) = self.canvas.window().drawable_size();
             let (nx, ny) = {
                 let game = self
@@ -271,9 +274,9 @@ impl Gui {
                             }
                         }
                     }
-                    Event::MouseMotion { x, y, .. } => mouse_pos = {
+                    Event::MouseMotion { x, y, .. } => {
                         trace!("Mouse: {} {}", x, y);
-                        (x, y)
+                        mouse_pos = (x, y);
                     }
                     _ => {}
                 }
@@ -347,6 +350,7 @@ impl Gui {
                 }
             }
             if let Some((title, msg)) = &message {
+                trace!("{}: {}", title, msg);
                 let surf = font
                     .render(&title)
                     .blended(Color::RGB(255, 255, 255))
@@ -357,7 +361,7 @@ impl Gui {
                 r.y = h as i32 / 5;
                 r.w = h as i32 / (20 * r.h);
                 r.h = h as i32 / 20;
-                //self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
+                self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
                 message_start = timer.ticks();
             }
             self.canvas.present();
