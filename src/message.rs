@@ -9,9 +9,11 @@ pub enum FromGuiMessage {
 
 #[derive(Debug)]
 pub enum ToGuiMessage {
+    Start,
     Message(String, String),
     ExcavateResult(i32, Option<Building>, (u32, u32)),
     ClearExcavate,
     ClearBuilding,
+    SetBuilding((u32, u32), Building),
     Quit,
 }

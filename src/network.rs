@@ -48,6 +48,8 @@ enum Answer {
     Error {
         message: String,
         subtype: Option<String>,
+        pos: Option<(u32, u32)>,
+        building: Option<Building>,
     },
     Debug {
         message: String,
@@ -120,6 +122,7 @@ impl EpochClient {
                                 (*g).size = s;
                                 (*g).rejoin = r.clone();
                             }
+                            tx.send(ToGuiMessage::Start)?;
                         }
                         Answer::EndOfTurn {
                             scores: s,
@@ -149,13 +152,23 @@ impl EpochClient {
                         Answer::Error {
                             message: msg,
                             subtype: st,
+                            pos: p,
+                            building: b,
                         } => {
                             error!("Error message from server: \n{}", msg);
                             if let Some(subtype) = st {
                                 match subtype.to_lowercase().as_str() {
                                     "invalidbuilderror" => tx.send(ToGuiMessage::ClearBuilding)?,
                                     "buildactionalreadyusederror" => {
-                                        tx.send(ToGuiMessage::ClearBuilding)?
+                                        tx.send(ToGuiMessage::ClearBuilding)?;
+                                        if let Some(pos) = p {
+                                            if let Some(building) = b {
+                                                tx.send(ToGuiMessage::SetBuilding(
+                                                    pos,
+                                                    building.clone(),
+                                                ))?;
+                                            }
+                                        }
                                     }
                                     "gamealreadyrunning" => {
                                         tx.send(ToGuiMessage::Quit)?;
@@ -225,13 +238,13 @@ impl EpochClient {
         stream.set_write_timeout(Some(Duration::from_millis(1000)))?;
         debug!("Connected.");
         let reader = BufReader::new(stream.try_clone()?);
-        let handle = {
+        let _ = {
             let game = self.game.clone();
             let tx = self.tx.clone();
             thread::spawn(move || EpochClient::listen(reader, tx, game))
         };
-        let mut reader = BufReader::new(stdin());
-        let mut line = String::new();
+        let reader = BufReader::new(stdin());
+        let line = String::new();
         if let Some(ref t) = self.token {
             Command::Rejoin { token: t.clone() }.send(&mut stream)?;
         } else {
