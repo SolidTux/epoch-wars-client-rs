@@ -136,6 +136,7 @@ impl EpochClient {
                             turn: t,
                             excavate_result: e,
                         } => {
+                            tx.send(ToGuiMessage::UpdateGrid)?;
                             tx.send(ToGuiMessage::UpdateBuildings)?;
                             tx.send(ToGuiMessage::ClearBuilding)?;
                             tx.send(ToGuiMessage::ClearExcavate)?;
