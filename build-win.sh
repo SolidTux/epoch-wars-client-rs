@@ -11,7 +11,7 @@ pushd target/sdl
 curl -O "$SDL_URL"
 curl -O "$TTF_URL"
 curl -O "$IMG_URL"
-find -iname '*.zip' -exec unzip -u '{}' \;
+yes | find -iname '*.zip' -exec unzip -u '{}' \;
 popd
 
 cargo build --release --target=x86_64-pc-windows-gnu
