@@ -1,5 +1,6 @@
 use failure::Error;
 use serde_json;
+use std::collections::HashMap;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::net::{TcpStream, ToSocketAddrs};
@@ -45,6 +46,8 @@ enum Answer {
         map: Vec<MapAnswer>,
         turn: u32,
         excavate_result: Option<ExcavateAnswer>,
+        current_prices: HashMap<Building, u32>,
+        tower_count: u32,
     },
     Error {
         message: String,
@@ -131,23 +134,27 @@ impl EpochClient {
                             tx.send(ToGuiMessage::Start)?;
                         }
                         Answer::EndOfTurn {
-                            scores: s,
-                            map: m,
-                            turn: t,
-                            excavate_result: e,
+                            scores,
+                            map,
+                            turn,
+                            excavate_result,
+                            current_prices,
+                            tower_count,
                         } => {
                             tx.send(ToGuiMessage::UpdateGrid)?;
                             tx.send(ToGuiMessage::UpdateBuildings)?;
                             tx.send(ToGuiMessage::ClearBuilding)?;
                             tx.send(ToGuiMessage::ClearExcavate)?;
                             if let Ok(mut g) = game.lock() {
-                                (*g).scores = s;
+                                (*g).scores = scores;
                                 (*g).buildings.clear();
-                                (*g).turn = t;
-                                for e in m {
+                                (*g).turn = turn;
+                                (*g).prices = current_prices;
+                                (*g).tower_count = tower_count;
+                                for e in map {
                                     (*g).buildings.insert(e.pos, e.building);
                                 }
-                                if let Some(er) = e {
+                                if let Some(er) = excavate_result {
                                     tx.send(ToGuiMessage::ExcavateResult(
                                         er.depth,
                                         er.building,

@@ -7,6 +7,8 @@ pub struct Game {
     pub size: (u32, u32),
     pub scores: Vec<ScoreEntry>,
     pub buildings: HashMap<(u32, u32), Building>,
+    pub prices: HashMap<Building, u32>,
+    pub tower_count: u32,
     pub turn: u32,
     pub rejoin: String,
 }
@@ -26,6 +28,8 @@ impl Game {
             buildings: HashMap::new(),
             turn: 0,
             rejoin: String::new(),
+            tower_count: 0,
+            prices: HashMap::new(),
         }
     }
 }
