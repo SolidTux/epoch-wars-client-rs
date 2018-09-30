@@ -1,7 +1,7 @@
 use failure::Error;
 use serde_json;
 use std::io::prelude::*;
-use std::io::{stdin, BufReader};
+use std::io::BufReader;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -179,7 +179,6 @@ impl EpochClient {
                             }
                             tx.send(ToGuiMessage::Message("Error".to_string(), msg))?;
                         }
-                        _ => warn!("Unimplemented answer type received."),
                     }
                 }
                 Err(e) => {
@@ -243,8 +242,6 @@ impl EpochClient {
             let tx = self.tx.clone();
             thread::spawn(move || EpochClient::listen(reader, tx, game))
         };
-        let reader = BufReader::new(stdin());
-        let line = String::new();
         if let Some(ref t) = self.token {
             Command::Rejoin { token: t.clone() }.send(&mut stream)?;
         } else {

@@ -311,10 +311,9 @@ impl Gui {
                             .render(&s)
                             .blended(Color::RGB(255, 255, 255))
                             .map_err(err_msg)?;
-                        let text = texture_creator.create_texture_from_surface(&surf).unwrap();
                         let mut r = surf.rect();
                         f = f.min((x_min as f64) / (r.w as f64));
-                        h = h.max(r.h);
+                        h = h.max((r.h as f64).round() as i32);
                         strings.push(s);
                     }
                     for (i, s) in strings.iter().enumerate() {
@@ -326,7 +325,6 @@ impl Gui {
                             let text = texture_creator.create_texture_from_surface(&surf).unwrap();
                             let mut r = surf.rect();
                             r.y += h * (i as i32);
-                            let f = (x_min as f64) / (r.w as f64);
                             r.w = ((r.w as f64) * f).round() as i32;
                             r.h = ((r.h as f64) * f).round() as i32;
                             self.canvas.copy(&text, None, Some(r)).map_err(err_msg)?;
