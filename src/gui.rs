@@ -188,7 +188,7 @@ impl Gui {
             };
             let x = (w as f64) / (nx as f64);
             let y = (h as f64) / (ny as f64);
-            let s = x.min(y).round() as u32;
+            let s = x.min(y).floor() as u32;
             let x_min = w - s * nx;
             let y_min = (h - s * ny) / 2;
             let ew = (x_min * 2 / 9) as i32;

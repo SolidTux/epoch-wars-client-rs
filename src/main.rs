@@ -89,7 +89,7 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
     );
     let _handle = thread::spawn(move || client.run(direct));
 
-    let mut g = Gui::new((800, 600), false, tx_gui, rx_gui, game.clone())?;
+    let mut g = Gui::new((1024, 768), false, tx_gui, rx_gui, game.clone())?;
     g.run();
     Ok(())
 }
