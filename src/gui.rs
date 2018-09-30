@@ -274,10 +274,7 @@ impl Gui {
                             }
                         }
                     }
-                    Event::MouseMotion { x, y, .. } => {
-                        trace!("Mouse: {} {}", x, y);
-                        mouse_pos = (x, y);
-                    }
+                    Event::MouseMotion { x, y, .. } => mouse_pos = (x, y),
                     _ => {}
                 }
             }
@@ -289,6 +286,7 @@ impl Gui {
                     sprite.draw(&texture_creator, &mut self.canvas)?;
                     if let Some(r) = sprite.rect {
                         if sprite.contains(mouse_pos) {
+                            trace!("Mouse in {:?} {:?}\n{:?}", sprite.index, mouse_pos, r);
                             self.canvas.set_draw_color(Color::RGB(255, 0, 0));
                             let r = r.clone();
                             self.canvas.draw_rect(r).map_err(err_msg)?;
