@@ -6,16 +6,19 @@ extern crate failure;
 extern crate log;
 
 extern crate clap;
+extern crate rodio;
 extern crate sdl2;
 extern crate serde;
 extern crate serde_json;
 extern crate stderrlog;
 
+mod audio;
 mod game;
 mod gui;
 mod message;
 mod network;
 
+use audio::*;
 use game::*;
 use gui::*;
 use network::*;
@@ -119,6 +122,8 @@ fn main_res(matches: ArgMatches) -> Result<(), Error> {
         game.clone(),
     );
     let _handle = thread::spawn(move || client.run(direct));
+    let audio = Audio::new()?;
+    let _audio_handle = thread::spawn(move || audio.run());
 
     let mut g = Gui::new(size, fullscreen, tx_gui, rx_gui, game.clone())?;
     g.run();

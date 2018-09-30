@@ -9,3 +9,4 @@ Simple client for epoch-wars.
 ## Attributions
 
  * Sprites from [isaiah658](https://opengameart.org/content/isaiah658s-pixel-pack-1)
+ * Music from [cynicmusic](https://opengameart.org/content/town-theme-rpg)

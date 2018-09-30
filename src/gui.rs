@@ -150,7 +150,7 @@ impl Gui {
 
         let mut canvas = window.into_canvas().build()?;
 
-        canvas.set_draw_color(Color::RGB(0, 255, 0));
+        canvas.set_draw_color(Color::RGB(50, 50, 50));
         canvas.clear();
         canvas.present();
         Ok(Gui {
