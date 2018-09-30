@@ -131,7 +131,6 @@ impl Gui {
         assets.active[2].building = Some(Building::Tower);
 
         let mut window_builder = video.window("Epoch Wars", size.0, size.1);
-        window_builder.allow_highdpi();
         if fullscreen {
             window_builder.fullscreen_desktop();
         }
